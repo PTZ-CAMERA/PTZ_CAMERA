@@ -13,8 +13,11 @@ fi
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
+cmake -S "$script_dir" -B "$script_dir/build"
+cmake --build "$script_dir/build" -j2
+
 install -Dm644 "$script_dir/mediamtx.yml" /etc/ptz-camera/mediamtx.yml
-install -Dm755 "$script_dir/publish.sh" /usr/local/libexec/ptz-camera/publish.sh
+install -Dm755 "$script_dir/build/ptz_camera_publisher" /usr/local/libexec/ptz-camera/ptz_camera_publisher
 install -Dm755 "$script_dir/watchdog.sh" /usr/local/libexec/ptz-camera/watchdog.sh
 install -Dm644 "$script_dir/ptz-camera.service" /etc/systemd/system/ptz-camera.service
 install -Dm644 "$script_dir/ptz-camera-watchdog.service" /etc/systemd/system/ptz-camera-watchdog.service

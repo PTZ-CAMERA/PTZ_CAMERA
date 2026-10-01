@@ -3,6 +3,14 @@
 Record each new problem investigated in this project here: symptom, cause,
 checks, change, and verification. Add a new dated entry for each incident.
 
+## 2026-10-02 — GStreamer hardware H.264 encoder failed during C++ migration
+
+- **Symptom:** `libcamerasrc → videoconvert → v4l2h264enc` started but then reported `Failed to process frame` from `GstV4l2VideoEnc` on this Pi 4. A direct NV12 path failed format negotiation.
+- **Check:** The same 1280×720, 30fps camera stream worked with `videoconvert → x264enc`; the `rtspclientsink` package was missing and was installed as `gstreamer1.0-rtsp`.
+- **Cause:** The V4L2 encoder path could not process these GStreamer camera buffers in the tested configuration. The exact driver/buffer incompatibility is not yet established.
+- **Change:** Added a C++17 GStreamer publisher using `libcamerasrc`, `videoconvert`, `x264enc`, `h264parse`, and `rtspclientsink`; MediaMTX now starts this executable. The old `libcamera-vid | ffmpeg` publishing script was removed.
+- **Verification:** CMake build passed. MediaMTX accepted the local RTSP publisher; FFmpeg decoded 151 frames in a 5-second stream sample. RTSP reported H.264 Constrained Baseline, 1280×720, 30fps, and the WebRTC page returned HTTP 200. The publisher used approximately 115% CPU during this check; remote browser playback remains to be checked.
+
 ## 2026-10-01 — Intermittent magenta/pink video frames
 
 - **Symptom:** The PC stream occasionally shows a pink image with horizontal corruption.

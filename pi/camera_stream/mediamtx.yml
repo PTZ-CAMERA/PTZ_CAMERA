@@ -12,5 +12,5 @@ hlsAddress: :8891  # Leave pigpio's default TCP port 8888 free.
 paths:
   cam:
     source: publisher
-    runOnInit: /usr/local/libexec/ptz-camera/publish.sh
+    runOnInit: /usr/local/libexec/ptz-camera/ptz_camera_publisher
     runOnInitRestart: true

@@ -10,7 +10,7 @@ Pi가 서보를 제어하고 IMX219 카메라 영상을 송출합니다. PC의 Q
 PTZ_CAMERA/
 ├── pi/
 │   ├── servo_test/       # pigpio 기반 PAN/TILT 테스트 (C++17)
-│   └── camera_stream/    # libcamera-vid → MediaMTX 송출 및 systemd 서비스
+│   └── camera_stream/    # C++17 카메라 송출기 → MediaMTX 및 systemd 서비스
 ├── docs/
 │   └── sessions/         # 작업 기록
 └── troubleshotting.md    # 문제별 조사·조치 기록
