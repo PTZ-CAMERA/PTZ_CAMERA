@@ -30,7 +30,7 @@ gboolean handleSignal(gpointer) {
 
 gboolean handleBusMessage(GstBus *, GstMessage *message, gpointer) {
     // 카메라·인코더·RTSP 발행 중 어느 단계에서든 오류가 나면 종료한다.
-    // MediaMTX의 runOnInitRestart가 종료된 송출기를 다시 실행한다.
+    // 시청자가 남아 있으면 MediaMTX의 runOnDemandRestart가 송출기를 다시 실행한다.
     switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_ERROR: {
         GError *error = nullptr;

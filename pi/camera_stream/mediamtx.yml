@@ -9,8 +9,15 @@ webrtc: true
 hls: true
 hlsAddress: :8891  # Leave pigpio's default TCP port 8888 free.
 
+# The watchdog reads viewer counts here. Keep diagnostics local to the Pi.
+metrics: true
+metricsAddress: 127.0.0.1:9998
+
 paths:
   cam:
     source: publisher
-    runOnInit: /usr/local/libexec/ptz-camera/ptz_camera_publisher
-    runOnInitRestart: true
+    # Start the camera only for a reader; stop it shortly after the last reader.
+    runOnDemand: /usr/local/libexec/ptz-camera/ptz_camera_publisher
+    runOnDemandRestart: true
+    runOnDemandStartTimeout: 15s
+    runOnDemandCloseAfter: 5s

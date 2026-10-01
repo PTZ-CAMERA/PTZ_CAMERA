@@ -3,6 +3,12 @@
 Record each new problem investigated in this project here: symptom, cause,
 checks, change, and verification. Add a new dated entry for each incident.
 
+## 2026-10-02 — `jq` package download returned 404 during on-demand setup
+
+- **Symptom:** `apt-get install jq` failed because the Bullseye security repository returned 404 for its indexed `jq` and `libjq1` package versions. `apt-get update` did not resolve it.
+- **Change:** Avoided the extra package. The on-demand watchdog reads MediaMTX's localhost-only Prometheus metrics with the already installed `curl` and `awk` tools.
+- **Verification:** MediaMTX exposed `paths_readers{name="cam",readerType="",state="notReady"} 0` while idle and a reader count of 1 during an RTSP or WebRTC viewing session.
+
 ## 2026-10-02 — GStreamer hardware H.264 encoder failed during C++ migration
 
 - **Symptom:** `libcamerasrc → videoconvert → v4l2h264enc` started but then reported `Failed to process frame` from `GstV4l2VideoEnc` on this Pi 4. A direct NV12 path failed format negotiation.
