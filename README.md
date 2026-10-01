@@ -9,7 +9,7 @@ Pi가 서보를 제어하고 IMX219 카메라 영상을 송출합니다. PC의 Q
 ```text
 PTZ_CAMERA/
 ├── pi/
-│   ├── servo_test/       # pigpio 기반 PAN/TILT 테스트 (C++17)
+│   ├── servo_test/       # pigpio 기반 PAN/TILT 키보드·TCP 제어 (C++17)
 │   └── camera_stream/    # C++17 카메라 송출기 → MediaMTX 및 systemd 서비스
 ├── docs/
 │   └── sessions/         # 작업 기록
@@ -26,6 +26,7 @@ PTZ_CAMERA/
 GND를 공통 연결**합니다. GPIO에는 서보 신호만 연결합니다.
 
 ```sh
+sudo systemctl stop ptz-servo.service  # TCP 서비스가 실행 중일 때만
 cmake -S pi/servo_test -B pi/servo_test/build
 cmake --build pi/servo_test/build -j4
 sudo ./pi/servo_test/build/servo_test
@@ -34,6 +35,9 @@ sudo ./pi/servo_test/build/servo_test
 키는 `a`/`d`(PAN), `w`/`s`(TILT), `c`(중앙), `q`(종료)입니다. 현재 범위는
 PAN 25~155도, TILT 40~140도입니다. 자세한 내용은
 [서보 코드](pi/servo_test/src/main.cpp)를 참고하세요.
+
+PC Qt 버튼 제어에는 Pi의 TCP 5000 서버가 필요합니다. 설치와 명령 형식은
+[서보 제어 안내](pi/servo_test/README.md)를 참고하세요.
 
 ## 카메라 송출
 

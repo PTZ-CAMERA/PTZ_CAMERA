@@ -3,6 +3,13 @@
 Record each new problem investigated in this project here: symptom, cause,
 checks, change, and verification. Add a new dated entry for each incident.
 
+## 2026-10-02 — Servo service exited abnormally on systemd stop
+
+- **Symptom:** Stopping `ptz-servo.service` logged pigpio `sigHandler: Unhandled signal 18, terminating`, and systemd reported exit status 255.
+- **Cause:** systemd sends SIGCONT during service shutdown; pigpio's installed signal handler treated it as an unexpected signal before normal GPIO cleanup finished. The install script also started and immediately restarted the service.
+- **Change:** The C++ process now ignores SIGCONT after pigpio initialization, while handling SIGTERM in its normal shutdown loop. The installer starts or restarts the service once.
+- **Verification:** Rebuilt and reinstalled the C++ program. `systemctl stop ptz-servo.service` then logged `Servo pulses stopped.` and systemd reported `Succeeded`; the service started again normally.
+
 ## 2026-10-02 — `jq` package download returned 404 during on-demand setup
 
 - **Symptom:** `apt-get install jq` failed because the Bullseye security repository returned 404 for its indexed `jq` and `libjq1` package versions. `apt-get update` did not resolve it.
