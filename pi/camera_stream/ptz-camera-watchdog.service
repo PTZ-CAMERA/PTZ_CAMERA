@@ -1,0 +1,7 @@
+[Unit]
+Description=Check PTZ camera stream for decoded frames
+After=ptz-camera.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/ptz-camera/watchdog.sh

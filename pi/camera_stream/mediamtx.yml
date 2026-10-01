@@ -1,0 +1,16 @@
+# Raspberry Pi 4 / IMX219 camera stream for the PC-side Qt UI.
+rtspTransports: [tcp]
+rtmp: false
+srt: false
+moq: false
+
+# WebRTC is suitable for a browser or Qt WebEngine view. HLS is a fallback.
+webrtc: true
+hls: true
+hlsAddress: :8891  # Leave pigpio's default TCP port 8888 free.
+
+paths:
+  cam:
+    source: publisher
+    runOnInit: /usr/local/libexec/ptz-camera/publish.sh
+    runOnInitRestart: true
