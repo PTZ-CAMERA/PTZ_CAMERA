@@ -1,0 +1,19 @@
+[Unit]
+Description=PTZ ONVIF discovery and RTSP URI service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ptz-onvif
+DynamicUser=true
+LoadCredential=onvif.auth:/etc/ptz-camera/access.conf
+ExecStart=/usr/local/libexec/ptz-onvif/ptz_onvif --interface eth0
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

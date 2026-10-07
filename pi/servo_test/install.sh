@@ -9,6 +9,7 @@ fi
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 cmake -S "$script_dir" -B "$script_dir/build"
 cmake --build "$script_dir/build" -j2
+ctest --test-dir "$script_dir/build" --output-on-failure
 
 install -Dm755 "$script_dir/build/servo_test" /usr/local/libexec/ptz-servo/servo_test
 install -Dm644 "$script_dir/ptz-servo.service" /etc/systemd/system/ptz-servo.service
@@ -16,4 +17,4 @@ systemctl daemon-reload
 systemctl enable ptz-servo.service
 systemctl restart ptz-servo.service
 
-echo 'Servo TCP service installed on port 5000.'
+echo 'Servo loopback IPC service installed on port 5000.'

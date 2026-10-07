@@ -1,5 +1,6 @@
 # Raspberry Pi 4 / IMX219 camera stream for the PC-side Qt UI.
-rtspTransports: [tcp]
+# Keep the local C++ publisher on TCP; allow Qt viewers to choose TCP or UDP.
+rtspTransports: [udp, tcp]
 rtmp: false
 srt: false
 moq: false
@@ -16,8 +17,28 @@ metricsAddress: 127.0.0.1:9998
 paths:
   cam:
     source: publisher
+    # 추적 중에만 내부 reader를 유지해 기존 on-demand 캡처를 재사용한다.
+    runOnInit: /usr/local/libexec/ptz-camera/ptz_capture_lease
+    runOnInitRestart: true
     # Start the camera only for a reader; stop it shortly after the last reader.
     runOnDemand: /usr/local/libexec/ptz-camera/ptz_camera_publisher
     runOnDemandRestart: true
     runOnDemandStartTimeout: 15s
     runOnDemandCloseAfter: 5s
+
+# BEGIN LOCAL_AUTH_DEFAULT
+# Remote viewers require credentials generated outside the repository.
+# Without account setup, only Pi-internal publisher/watchdog access is allowed.
+authMethod: internal
+rtspAuthMethods: [digest]
+authInternalUsers:
+  - user: any
+    pass: ''
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: publish
+        path: cam
+      - action: read
+        path: cam
+      - action: metrics
+# END LOCAL_AUTH_DEFAULT

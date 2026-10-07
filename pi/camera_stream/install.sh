@@ -13,11 +13,27 @@ fi
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
+"$script_dir/fetch_model.sh"
+
 cmake -S "$script_dir" -B "$script_dir/build"
 cmake --build "$script_dir/build" -j2
 
-install -Dm644 "$script_dir/mediamtx.yml" /etc/ptz-camera/mediamtx.yml
+if [[ -s /etc/ptz-camera/access.conf ]]; then
+  if [[ ! -x /usr/local/libexec/ptz-onvif/configure_access ]]; then
+    echo 'Install the ONVIF authentication tools before reinstalling the camera service.' >&2
+    exit 1
+  fi
+  /usr/local/libexec/ptz-onvif/configure_access --render-media \
+    /etc/ptz-camera/access.conf "$script_dir/mediamtx.yml" /etc/ptz-camera/mediamtx.yml
+else
+  install -Dm644 "$script_dir/mediamtx.yml" /etc/ptz-camera/mediamtx.yml
+fi
+install -Dm755 "$script_dir/build/ptz_capture_lease" /usr/local/libexec/ptz-camera/ptz_capture_lease
 install -Dm755 "$script_dir/build/ptz_camera_publisher" /usr/local/libexec/ptz-camera/ptz_camera_publisher
+install -Dm644 "$script_dir/models/deploy.prototxt" /usr/local/share/ptz-camera/deploy.prototxt
+install -Dm644 "$script_dir/models/mobilenet_iter_73000.caffemodel" /usr/local/share/ptz-camera/mobilenet_iter_73000.caffemodel
+install -Dm644 "$script_dir/models/LICENSE" /usr/local/share/ptz-camera/MobileNet-SSD-LICENSE
+"$script_dir/build/ptz_camera_publisher" --check-model
 install -Dm755 "$script_dir/watchdog.sh" /usr/local/libexec/ptz-camera/watchdog.sh
 install -Dm644 "$script_dir/ptz-camera.service" /etc/systemd/system/ptz-camera.service
 install -Dm644 "$script_dir/ptz-camera-watchdog.service" /etc/systemd/system/ptz-camera-watchdog.service

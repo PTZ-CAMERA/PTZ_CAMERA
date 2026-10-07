@@ -16,3 +16,15 @@ compile_commands.json
 captures/
 recordings/
 *.log
+
+# Downloaded pretrained detector weights are installed separately from source.
+pi/camera_stream/models/*.caffemodel
+pi/camera_stream/models/*.prototxt
+pi/camera_stream/models/LICENSE
+
+# Performance trial data (summaries are copied to docs/performance separately).
+tools/performance/results/
+
+# Local account files are kept outside the repository.
+**/access.conf
+**/access.conf.tmp.*

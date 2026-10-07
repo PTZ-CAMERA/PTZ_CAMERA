@@ -4,6 +4,43 @@
 GPIO는 BCM 번호 기준으로 PAN 18, TILT 19, 버튼 17입니다. 서보 전원은 외부
 4.8~6V에서 공급하고 Pi GND와 외부 전원 GND를 공통 연결합니다.
 
+## 소스 구조
+
+`src/`에서 기능별 `.cpp`는 구현을, 같은 이름의 `.h`는 다른 파일에서 호출할
+함수와 자료형의 선언을 담습니다. 함수 중심 구조이며 공유 각도와 잠금은
+`servo/servo_control.cpp` 내부에서 관리합니다.
+
+| 파일 | 역할 |
+| --- | --- |
+| `main.cpp` | 실행 모드 선택, 초기화, 입력 대기 루프, 종료 순서 |
+| `config.h` | BCM GPIO, TCP 포트, debounce. 각도/속도는 common/control/ptz_limits.h 참조 |
+| `motion/motion_plan.cpp/.h` | 목표 이동·속도·타임아웃의 순수 계산 |
+| `servo/servo_control.cpp/.h` | 기존 함수 adapter, 공유 mutex와 객체 연결 |
+| `control/` | ControlArbiter 우선순위·세대, PtzController 이동 계획 |
+| `hardware/` | ServoDriver GPIO 초기화·pulse·종료 |
+| `button/center_button.cpp/.h` | GPIO17 풀업 설정, active-low 콜백, debounce, 버튼 등록 해제 |
+| `keyboard/keyboard_control.cpp/.h` | 터미널 설정·복원, 키 매핑, 직접 키 제어와 로컬 TCP 클라이언트 |
+| `network/tcp_server.cpp/.h` | TCP 연결·해제, 연결별 수신 버퍼, 개행 기준 분리, 길이 제한, 메시지 송신 |
+| `protocol/command_protocol.cpp/.h` | PTZ/TRACK/AUTO 명령 해석, 카메라 등록, Qt 상태 알림 |
+
+```text
+src/
+├── main.cpp
+├── config.h
+├── motion/      # 궤적 계산
+├── servo/       # 각도·펄스 제어
+├── button/      # 중앙 복귀 버튼
+├── keyboard/    # 터미널 키 입력
+├── network/     # TCP 연결·수신 버퍼
+└── protocol/    # 명령 해석·상태 알림
+```
+
+각 기능 디렉토리에 같은 이름의 `.h`와 `.cpp`가 함께 있습니다.
+
+읽을 때는 `main.cpp` → `protocol/command_protocol.cpp` → `servo/servo_control.cpp` 순서로
+따라가면 TCP 명령이 실제 서보 펄스로 이어지는 흐름을 볼 수 있습니다.
+버튼은 `button/center_button.cpp`에서 `centerServos()`를 호출합니다.
+
 ## 설치 및 실행
 
 ```sh
@@ -16,42 +53,66 @@ systemctl status ptz-servo.service
 부팅 후에도 서비스가 자동 시작됩니다. 서버를 끄려면
 `sudo systemctl stop ptz-servo.service`를 실행합니다.
 
-터미널 수동 제어만 할 때는 서비스를 먼저 중지하고 다음처럼 실행합니다. pigpio를
-사용하는 두 프로세스를 동시에 실행하지 마세요.
+서비스가 실행 중일 때 `./pi/servo_test/build/servo_test`를 실행하면 로컬 TCP
+클라이언트로 접속해 같은 키로 제어합니다. 이 경우 GPIO는 서비스 한 프로세스만
+사용하며 `sudo`가 필요하지 않습니다. `--client`를 붙이면 클라이언트 모드를
+명시할 수 있습니다.
+
+서버를 거치지 않고 GPIO를 직접 테스트할 때는 서비스를 먼저 중지하세요. pigpio를
+사용하는 두 프로세스를 동시에 실행할 수 없습니다.
 
 ```sh
 sudo systemctl stop ptz-servo.service
-sudo ./pi/servo_test/build/servo_test
+sudo ./pi/servo_test/build/servo_test --direct
+sudo systemctl start ptz-servo.service
 ```
 
 터미널에서 `--server`를 붙이면 TCP와 키보드 제어를 동시에 사용할 수 있습니다.
 키는 `a`/`d`(PAN), `w`/`s`(TILT), `c`(중앙), `q`(종료)입니다.
 
-## Qt와 TCP 명령
+## Qt ONVIF PTZ와 내부 TCP
 
-Qt `NetworkClient::sendLine()`과 같이 TCP `5000` 포트로 UTF-8 명령 한 줄을
-보냅니다. 각 줄의 끝은 `\n` 또는 `\r\n`입니다. 한 연결에서 여러 줄을
-연속으로 보낼 수 있습니다.
+Qt의 이동 버튼과 키보드 제어는 인증된 ONVIF PTZ API를 사용한다.
+[Qt 변경 요청서](../../docs/onvif_ptz_qt_migration.md)에 endpoint, 좌표, 요청 예시가 있다.
+외부 `PTZ:LEFT/RIGHT/UP/DOWN/CENTER`는 이제 거부한다.
 
-| 명령 | 동작 |
+Pi 내부 키보드 클라이언트는 기존 PTZ 명령을 사용한다. TCP 5000은 내부 ONVIF
+게이트웨이·카메라 송출기·ONVIF 관측 연결을 담당한다. 외부 Qt는 이 포트에 접속하지 않는다.
+
+| 명령 | 접근·동작 |
 | --- | --- |
-| `PTZ:LEFT` | PAN -5° |
-| `PTZ:RIGHT` | PAN +5° |
-| `PTZ:UP` | TILT +5° |
-| `PTZ:DOWN` | TILT -5° |
-| `PTZ:CENTER` | PAN/TILT 90° |
+| PTZ:LEFT/RIGHT/UP/DOWN/CENTER | loopback 키보드 클라이언트만 허용, 기존 5°/중앙 복귀 |
+| ONVIF:ABS/REL/VEL/STOP/STATUS | loopback 게이트웨이 전용, 목표·속도·정지·상태 |
+| TRACK:ON/OFF | Pi 내부 진단용 추적 전환. 외부는 ONVIF 사용 |
+| CAMERA:HELLO, AUTO:* | Pi 내부에 등록된 카메라 송출기 |
 
-PAN은 25~155°, TILT는 40~140°로 제한합니다. 각 버튼 입력은 한 번에 5°만
-움직이므로 누르고 있는 동안 계속 움직이려면 Qt가 명령을 반복 전송해야 합니다.
-현재 Qt 코드의 `TRACK:ON/OFF`는 객체 추적 기능이 없으므로 서버가
-`ERR tracking unavailable`을 반환합니다. 잘못된 명령도 `ERR`를 반환합니다.
-정상 PTZ 명령에는 응답하지 않습니다. 현재 Qt 수신 코드는 PTZ 응답을 해석하지
-않기 때문입니다. TCP 연결 성공과 실제 서보 이동은 별개이며, Pi 로그에서
-각도 변경을 확인할 수 있습니다.
+공유 제한값은 `common/control/ptz_limits.h`에 있다. PAN 25~155°, TILT 40~140°이다.
+`src/motion/motion_plan.*`은 순수 궤적 계산을, Controller는 이동 계획을, Driver는
+GPIO 출력을 담당한다. `servo_control`은 이 객체들의 공유 mutex와 adapter다. 약 20ms마다 목표를 갱신하며 절대/상대 이동은 15°/s, 연속 이동은 축별
+최대 30°/s이다. 연속 이동은 명령 Timeout(최대 5초), Stop 또는 경계에서 중단된다.
+
+중앙 버튼·로컬 키·수동 ONVIF 명령은 자동 추적을 해제한다. TRACK:ON은 기존 수동
+궤적을 취소한다. Stop은 펄스를 끄지 않고 마지막 명령 위치를 유지한다.
+상태는 출력 명령 기준이며 실물 위치나 기계적 정지 완료를 측정하지 않는다.
+
+서보 서비스는 내부 CAMERA/DETECT2/NO_DETECTION 상태를 loopback 관측으로
+ONVIF broker에 전달한다. 외부 탐지/추적 알림은 인증된 ONVIF Events를 사용한다.
 
 ```sh
-journalctl -u ptz-servo.service -f
+journalctl -u ptz-onvif.service -u ptz-servo.service -f
 ```
 
-이 서버는 인증 없이 LAN의 TCP 5000 포트에서 명령을 받으므로 신뢰할 수 있는
-네트워크에서만 사용하세요.
+ONVIF 로그에서 HTTP 상태와 인증 결과를, 서보 로그에서 ONVIF 내부 명령 및 각도
+갱신을 확인한다. 정상 이동의 HTTP 200은 수락이며 실제 기계적 도착 보장은 아니다.
+
+## 처리 시간·자원 사용량 측정
+
+새 빌드에는 `PTZ_PERF_LOG`로 활성화하는 CSV 계측이 포함되어 있습니다.
+측정 지점, 환경변수, 프로세스/스레드 자원 수집과 시험 조건은
+[성능 측정 안내](../../docs/performance/README.md)를 참고하세요.
+
+## 최신 Edge 계약
+
+TCP 5000은 loopback 전용이다. 외부 자동 추적은 ONVIF MoveAndStartTracking/Stop,
+알림은 PullPoint를 사용한다. v2 명령·모드 세대·클래스 경계와 검증은
+[Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)에 정리했다.
