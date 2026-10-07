@@ -243,3 +243,14 @@ Qt의 기존 `TRACK:ON/OFF` 요청을 서보 서비스의 추적 상태에 연�
 - 디렉토리: edge-camera를 통합 CMake 진입점으로 추가하고 실제 pi 소스/설치 경로를
   유지했다. 물리적 이동과 PC VMS 추가는 이후 단계에서 한다.
 - 계약과 조건: [Pi 구현 기록](EDGE_CAMERA_IMPLEMENTATION.md).
+
+## 2026-10-07: Edge Network Camera 설정/상태/제어 분리
+
+- 기존 pipeline/모델/GPIO/ONVIF를 재사용하고 CaptureManager/AnalysisFrame으로 수명을 관리한다.
+- 시작 JSON 설정은 Pi에 이미 있는 nlohmann 헤더를 사용한다. 런타임 reload는 제공하지 않는다.
+- 추적 사용자 요청과 자동 출력 gate를 분리한다. 수동 우선/Stop/timeout 후 유예 복귀와 명시적 OFF/중앙/fault 취소를 구분한다.
+- custom tracking_set/get/metadata_get은 기존 Digest HTTP 서버를 공유한다. 새 공개 TCP/WS 서버를 추가하지 않는다.
+- metadata는 ONVIF Events로 전달하며 실시간 property와 비 property 상태 전환을 분리한다.
+- GotoHomePosition은 기존 Controller의 설정 중앙 목표를 사용한다. ONVIF HomeSupported 구조는 공식 schema를 확인했다: https://www.onvif.org/ver10/schema/onvif.xsd
+- 실물/장시간 시험과 운영 재시작은 사용자 지시로 하지 않았다. 이후 추가 모의 검증도 중단했다.
+- 최신 변경/제한/사용자 검증 명령: [소프트웨어 보고서](EDGE_CAMERA_SOFTWARE_REPORT.md).

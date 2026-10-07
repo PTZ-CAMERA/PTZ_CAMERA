@@ -12,6 +12,10 @@ if [[ ! -x /usr/local/bin/mediamtx ]]; then
 fi
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# 기존 사용자 설정을 덮어쓰지 않고 첫 설치에만 공통 기본값을 배치한다.
+if [[ ! -e /etc/ptz-camera/camera.json ]]; then
+  install -Dm644 "$script_dir/../../edge-camera/config/camera.json" /etc/ptz-camera/camera.json
+fi
 
 "$script_dir/fetch_model.sh"
 

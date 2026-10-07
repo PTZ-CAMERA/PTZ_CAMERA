@@ -7,6 +7,7 @@
  */
 #include "network/server.h"
 #include "events/event_broker.h"
+#include "control/camera_control.h"
 #include "events/servo_feed.h"
 #include "auth/digest.h"
 #include "xml/xml.h"
@@ -123,7 +124,7 @@ void readRequest(Client &client, const Config &config, DigestAuth *auth) {
             return;
         }
         if (client.path != "/onvif/device_service" && client.path != "/onvif/media_service" &&
-            client.path != "/onvif/ptz_service" && client.path != "/onvif/events_service" &&
+            client.path != "/onvif/ptz_service" && client.path != "/onvif/events_service" && client.path != "/camera/control" &&
             client.path.rfind("/onvif/pullpoint/", 0) != 0) {
             client.output = http(404, "Unknown endpoint\n");
             return;
@@ -144,6 +145,9 @@ void readRequest(Client &client, const Config &config, DigestAuth *auth) {
             }
             headers[key] = trim(client.input.substr(colon + 1, end - colon - 1));
             offset = end + 2;
+        }
+        if (client.path=="/camera/control" && lower(headers["content-type"]).rfind("application/json",0)!=0) {
+            client.output=http(400,"JSON Content-Type required\n"); return;
         }
         if (headers.count("transfer-encoding") || !headers.count("content-length")) {
             client.output = http(400, "Content-Length required; chunked requests unsupported\n");
@@ -174,6 +178,11 @@ void readRequest(Client &client, const Config &config, DigestAuth *auth) {
     current.requestId = client.id;
     if (current.autoAddress)
         current.ip = interfaceAddress(current.interface);
+    if (client.path=="/camera/control") {
+        const auto result=cameraControl(current,client.input.substr(client.headerEnd,client.bodyLength));
+        client.output=http(result.status,result.xml,false,{},"application/json");
+        return;
+    }
     const auto result = soapResponse(current, client.path,
                                      client.input.substr(client.headerEnd, client.bodyLength));
     if (result.deferred) {

@@ -30,7 +30,7 @@ void setTiltAngle(int angle) {
 void centerServos() {
     std::lock_guard<std::mutex> lock(controlMutex);
     if (shuttingDown) return;
-    arbiter.manual(); controller.center();
+    arbiter.localCenter(); controller.center();
 }
 std::pair<int,int> currentAngles() {
     std::lock_guard<std::mutex> lock(controlMutex); return controller.angles();
@@ -99,6 +99,20 @@ void cleanupGpio() {
     shuttingDown = true;
     cleanupCenterButton();
     std::lock_guard<std::mutex> lock(controlMutex);
-    arbiter.manual(); controller.stop(); driver.cleanup();
+    arbiter.enable(false); controller.stop(); driver.cleanup();
+}
+} // namespace ptz
+
+namespace ptz {
+std::string runtimeStateLine() {
+    std::lock_guard<std::mutex> lock(controlMutex);
+    const auto s=controller.status();
+    return "RUNTIME:"+std::to_string(arbiter.requested())+","+std::to_string(arbiter.tracking())+","+
+        ptzModeName(arbiter.mode())+","+std::to_string(arbiter.generation())+","+
+        std::to_string(s.fault)+","+std::to_string(s.moving)+","+std::to_string(s.pan)+","+std::to_string(s.tilt);
+}
+bool stopAutomaticMotion(std::uint64_t generation) {
+    std::lock_guard<std::mutex> lock(controlMutex);
+    return !shuttingDown && arbiter.stopAutomatic(generation);
 }
 } // namespace ptz

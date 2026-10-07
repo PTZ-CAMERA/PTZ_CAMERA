@@ -1,0 +1,7 @@
+if(NOT TARGET edge_config)
+    find_path(EDGE_JSON_INCLUDE_DIR nlohmann/json.hpp REQUIRED)
+    add_library(edge_config STATIC ${CMAKE_CURRENT_LIST_DIR}/app_config.cpp)
+    target_compile_features(edge_config PUBLIC cxx_std_17)
+    target_include_directories(edge_config PUBLIC ${CMAKE_CURRENT_LIST_DIR}/.. PUBLIC ${EDGE_JSON_INCLUDE_DIR})
+    target_compile_options(edge_config PRIVATE -Wall -Wextra -Wpedantic)
+endif()

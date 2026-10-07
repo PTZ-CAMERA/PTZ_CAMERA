@@ -17,4 +17,14 @@ int main() {
     assert(left && left->panDelta==-3 && left->tiltDelta>0);
     assert(!selector.select({},640,360));
     assert(!tracking.update(*chosen,0,360,1280,720,300));
+    const auto now=TrackingController::Clock::now();
+    assert(tracking.state()==TargetState::NoTarget);
+    assert(tracking.observe(people,640,360,now)); assert(tracking.state()==TargetState::Acquired);
+    assert(tracking.observe(people,640,360,now+std::chrono::milliseconds(100)));
+    assert(tracking.state()==TargetState::Tracking);
+    assert(!tracking.observe({},640,360,now+std::chrono::milliseconds(500)));
+    assert(tracking.state()==TargetState::Tracking);
+    tracking.tick(now+std::chrono::milliseconds(1101)); assert(tracking.state()==TargetState::Lost);
+    assert(tracking.observe(people,640,360,now+std::chrono::milliseconds(1200)));
+    assert(tracking.state()==TargetState::Acquired);
 }

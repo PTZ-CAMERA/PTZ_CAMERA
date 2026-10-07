@@ -5,9 +5,9 @@ rtmp: false
 srt: false
 moq: false
 
-# WebRTC is suitable for a browser or Qt WebEngine view. HLS is a fallback.
-webrtc: true
-hls: true
+# Edge는 RTSP를 제공한다. WebRTC gateway와 Web client 영상 전달은 PC VMS 책임이다.
+webrtc: false
+hls: false
 hlsAddress: :8891  # Leave pigpio's default TCP port 8888 free.
 
 # The watchdog reads viewer counts here. Keep diagnostics local to the Pi.

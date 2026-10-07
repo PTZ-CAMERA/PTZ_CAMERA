@@ -3,7 +3,7 @@
 #include <algorithm>
 std::optional<PersonDetection> TargetSelector::select(const std::vector<PersonDetection>& people,
                                                      int width, int height) {
-    if (people.empty()) { reset(); return std::nullopt; }
+    if (people.empty()) return std::nullopt;
     const auto reference = previous_.value_or(cv::Point(width / 2, height / 2));
     const auto center = [](const PersonDetection& p) {
         return cv::Point(p.box.x + p.box.width / 2, p.box.y + p.box.height / 2);

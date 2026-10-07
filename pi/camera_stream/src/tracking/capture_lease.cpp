@@ -12,6 +12,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <unistd.h>
 #include <chrono>
+#include "config/app_config.h"
 #include <charconv>
 #include <csignal>
 #include <iostream>
@@ -75,6 +76,9 @@ bool trackingRequested() {
 }
 }
 int main(int argc, char** argv) {
+    try { edge::loadDefaultConfig(); } catch (const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
+    controlPort=static_cast<unsigned short>(edge::appConfig().controlPort);
+    rtspUrl="rtsp://127.0.0.1:"+std::to_string(edge::appConfig().rtspPort)+"/"+edge::appConfig().rtspPath;
     // 테스트/진단 주소는 loopback으로 제한한다. 운영 기본값과 서비스 경로는 유지한다.
     for (int i=1; i<argc; i+=2) {
         if (i+1>=argc) return 1;

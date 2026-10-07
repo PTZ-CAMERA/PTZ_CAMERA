@@ -12,6 +12,7 @@
 #include "metadata/detection_metadata.h"
 
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -22,6 +23,8 @@ namespace ptz {
 namespace {
 int cameraPublishers = 0;
 std::string latestDetection = "NO_DETECTION\n";
+std::string latestStreamState="CAMERA:STREAM:STOPPED\n";
+std::string latestCameraState="CAMERA:STATE:STOPPED\n",latestTargetState="TARGET:NO_TARGET\n";
 
 /**
  * 자동 추적의 두 정수 보정값을 끝까지 파싱하고 ±3도 범위를 확인한다. 뒤의 쓰레기 문자열도 허용하지 않는다.
@@ -70,9 +73,17 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
         if (command == "ONVIF:WATCH") {
             source.observer = true;
             reply(source.fd, cameraPublishers > 0 ? "CAMERA:CONNECTED\n" : "CAMERA:DISCONNECTED\n");
-            reply(source.fd, isTrackingEnabled() ? "TRACK:ON\n" : "TRACK:OFF\n");
+            reply(source.fd, isTrackingRequested() ? "TRACK:ON\n" : "TRACK:OFF\n");
+            reply(source.fd,runtimeStateLine()+"\n");
+            reply(source.fd,latestCameraState);
+            reply(source.fd,latestStreamState);
+            reply(source.fd,latestTargetState);
             reply(source.fd, latestDetection);
             return;
+        } else if (command == "ONVIF:RUNTIME") {
+            reply(source.fd,runtimeStateLine()+"\n"); return;
+        } else if (command == "ONVIF:TRACK_OFF") {
+            setTrackingEnabled(false); ok=true;
         } else if (command == "ONVIF:TRACK") {
             ok = startAutoTracking(false);
         } else if (command.rfind("ONVIF:MOVE_TRACK:", 0) == 0 &&
@@ -113,10 +124,26 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
     if (command == "CAMERA:HELLO" && local) {
         if (!source.publisher) {
             source.publisher = true;
-            if (++cameraPublishers == 1)
-                broadcastQt(clients, "CAMERA:CONNECTED\n");
+            if (++cameraPublishers == 1) {
+                latestCameraState="CAMERA:STATE:STARTING\n";
+                broadcastQt(clients, "CAMERA:CONNECTED\n"); broadcastQt(clients,latestCameraState);
+            }
         }
         reply(source.fd, "CAMERA:READY\n");
+        return;
+    }
+    if (command.rfind("CAMERA:STREAM:",0)==0 && local && source.publisher) {
+        const auto state=command.substr(14);
+        if (state=="STREAMING"||state=="STOPPED"||state=="ERROR") {
+            latestStreamState=command+"\n"; broadcastQt(clients,latestStreamState);
+        }
+        return;
+    }
+    if (command.rfind("CAMERA:STATE:",0)==0 && local && source.publisher) {
+        const auto state=command.substr(13);
+        if (state=="STARTING"||state=="RUNNING"||state=="STOPPED"||state=="ERROR") {
+            latestCameraState=command+"\n"; broadcastQt(clients,latestCameraState);
+        }
         return;
     }
     if (command == "TRACK:SNAPSHOT" && local) {
@@ -145,8 +172,23 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
         return;
     }
     if (command.rfind("AUTO:", 0) == 0) {
-        if (!local || !source.publisher || !isTrackingEnabled())
+        if (!local || !source.publisher)
             return;
+        if (command.rfind("AUTO:TARGET:",0)==0) {
+            const auto value=std::string_view(command).substr(12);
+            const auto comma=value.find(',');
+            if (comma==std::string_view::npos) return;
+            const auto state=value.substr(0,comma);
+            if (state!="NO_TARGET"&&state!="ACQUIRED"&&state!="TRACKING"&&state!="LOST"&&state!="ERROR") return;
+            std::uint64_t generation=0;
+            const auto r=std::from_chars(value.data()+comma+1,value.data()+value.size(),generation);
+            if (r.ec!=std::errc{}||r.ptr!=value.data()+value.size()||generation!=trackingGeneration()) return;
+            latestTargetState="TARGET:"+std::string(state)+"\n";
+            broadcastQt(clients,latestTargetState);
+            if (state=="LOST"||state=="ERROR") stopAutomaticMotion(generation);
+            return;
+        }
+        if (command.rfind("AUTO:MOVE",0)==0 && !isTrackingEnabled()) return;
         if (command.rfind("AUTO:MOVE2:", 0) == 0) {
             const std::string_view value(command.data()+11, command.size()-11);
             const auto last = value.rfind(',');
@@ -165,7 +207,7 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
             const auto state = trackingState();
             if (!metadata) { reply(source.fd,"ERR invalid detection\n"); return; }
             // 정상적인 수동 전환 경쟁으로 폐기한 결과에는 오류 응답을 끼워 넣지 않는다.
-            if (!state.first || metadata->generation != static_cast<std::int64_t>(state.second)) return;
+            if (metadata->generation != static_cast<std::int64_t>(state.second)) return;
             const auto angles = currentAngles();
             metadata->panAngle = angles.first; metadata->tiltAngle = angles.second;
             latestDetection = "DETECT2:" + encodeDetection(*metadata) + "\n";
@@ -182,6 +224,7 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
             return;
         }
         if (command.rfind("AUTO:DETECT:", 0) == 0) {
+            if (!isTrackingEnabled()) return;
             float confidence = 0;
             int x = 0, y = 0, ex = 0, ey = 0;
             char extra = 0;
@@ -214,7 +257,6 @@ void handleTcpCommand(TcpClient &source, std::vector<TcpClient> &clients, std::s
         }
         // Pi의 로컬 키 클라이언트는 기존 명령을 사용한다.
         // 수동 명령이 자동 제어를 즉시 해제한다.
-        setTrackingEnabled(false);
         if (command == "PTZ:LEFT")
             setPanAngle(currentPanAngle() - STEP_DEGREES);
         else if (command == "PTZ:RIGHT")
@@ -246,6 +288,9 @@ bool hasCameraPublisher() {
  */
 void cameraPublisherDisconnected(const TcpClient &client, const std::vector<TcpClient> &clients) {
     if (client.publisher && --cameraPublishers == 0) {
+        if (latestCameraState!="CAMERA:STATE:ERROR\n") latestCameraState="CAMERA:STATE:STOPPED\n";
+        latestTargetState="TARGET:NO_TARGET\n";
+        broadcastQt(clients,latestCameraState); broadcastQt(clients,latestTargetState);
         latestDetection = "NO_DETECTION\n";
         broadcastQt(clients, "CAMERA:DISCONNECTED\n");
         broadcastQt(clients, latestDetection);
@@ -256,12 +301,20 @@ void cameraPublisherDisconnected(const TcpClient &client, const std::vector<TcpC
  */
 void publishTrackingChanges(const std::vector<TcpClient> &clients) {
     static bool last = false;
-    const bool current = isTrackingEnabled();
-    if (current == last)
-        return;
+    const bool current = isTrackingRequested();
+    static std::string lastRuntime;
+    static auto nextRuntime=std::chrono::steady_clock::time_point{};
+    const auto runtime=runtimeStateLine();
+    const auto now=std::chrono::steady_clock::now();
+    if (runtime!=lastRuntime && now>=nextRuntime) {
+        broadcastQt(clients,runtime+"\n"); lastRuntime=runtime;
+        nextRuntime=now+std::chrono::milliseconds(1000/edge::appConfig().tracking.metadataHz);
+    }
+    if (current == last) return;
     last = current;
     broadcastQt(clients, current ? "TRACK:ON\n" : "TRACK:OFF\n");
     if (!current) {
+        latestTargetState="TARGET:NO_TARGET\n"; broadcastQt(clients,latestTargetState);
         latestDetection = "NO_DETECTION\n";
         broadcastQt(clients, latestDetection);
     }

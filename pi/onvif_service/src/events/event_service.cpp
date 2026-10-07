@@ -79,7 +79,7 @@ std::vector<std::string> filters(const Node *filter) {
         const auto topic = term.substr(colon + 1);
         if (ns == expression->prefixes.end() || ns->second != TOPICS ||
             (topic != "Camera/Publishing" && topic != "Tracking/State" &&
-             topic != "Analytics/PersonDetection"))
+             topic != "Analytics/PersonDetection" && topic != "PTZ/State" && topic != "Runtime/StateEvent"))
             throw std::invalid_argument("Unknown topic");
         result.push_back(topic);
     }
@@ -106,10 +106,10 @@ Response eventOperation(const Config &config, const std::string &path, const Nod
                  "</tev:TopicNamespaceLocation>"
                  "<wsnt:FixedTopicSet>true</wsnt:FixedTopicSet><wstop:TopicSet>"
                  "<pc:Camera><Publishing wstop:topic=\"true\">" +
-                 desc({{"Connected", "boolean"}}) +
+                 desc({{"Connected", "boolean"},{"CameraState","string"},{"StreamState","string"}}) +
                  "</Publishing></pc:Camera>"
                  "<pc:Tracking><State wstop:topic=\"true\">" +
-                 desc({{"Enabled", "boolean"}}) +
+                 desc({{"Enabled", "boolean"},{"AutoAllowed","boolean"},{"TargetState","string"}}) +
                  "</State></pc:Tracking>"
                  "<pc:Analytics><PersonDetection wstop:topic=\"true\">" +
                  desc({{"Detected", "boolean"},
@@ -128,7 +128,14 @@ Response eventOperation(const Config &config, const std::string &path, const Nod
                        {"FrameId", "long"}, {"FramePtsNs", "long"}, {"CaptureUnixMs", "long"},
                        {"AnalysisUnixMs", "long"}, {"StreamEpoch", "long"}, {"Generation", "long"},
                        {"CaptureTimeSource", "string"}}) +
-                 "</PersonDetection></pc:Analytics></wstop:TopicSet>"
+                 "</PersonDetection></pc:Analytics>"
+                 "<pc:PTZ><State wstop:topic=\"true\">"+
+                 desc({{"Mode","string"},{"Moving","boolean"},{"Fault","boolean"},{"PanAngle","int"},{"TiltAngle","int"},{"Generation","long"}})+
+                 "</State></pc:PTZ>"
+                 "<pc:Runtime><StateEvent wstop:topic=\"true\"><tt:MessageDescription IsProperty=\"false\"><tt:Source>"
+                 "<tt:SimpleItemDescription Name=\"ProfileToken\" Type=\"tt:ReferenceToken\"/></tt:Source>"
+                 "<tt:Data><tt:SimpleItemDescription Name=\"Type\" Type=\"xs:string\"/></tt:Data>"
+                 "</tt:MessageDescription></StateEvent></pc:Runtime></wstop:TopicSet>"
                  "<wsnt:TopicExpressionDialect>http://docs.oasis-open.org/wsn/t-1/TopicExpression/"
                  "Concrete</wsnt:TopicExpressionDialect>"
                  "<wsnt:TopicExpressionDialect>http://www.onvif.org/ver10/tev/topicExpression/"

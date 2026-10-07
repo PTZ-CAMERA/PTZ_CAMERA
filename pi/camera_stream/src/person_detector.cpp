@@ -8,6 +8,7 @@
 #include "person_detector.h"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace {
@@ -51,13 +52,13 @@ std::vector<PersonDetection> PersonDetector::detect(const cv::Mat &bgr) {
         // 좌표는 영상 크기 대비 0~1 비율이다.
         const float *row = data + i * 7;
         // 사람 클래스가 아니거나 신뢰도가 기준보다 낮으면 후보에서 제외한다.
-        if (static_cast<int>(row[1]) != kPersonClassId || row[2] < kConfidenceThreshold)
-            continue;
+        if (!std::all_of(row,row+7,[](float value){return std::isfinite(value);})) continue;
+        if (row[1] != kPersonClassId || row[2] < kConfidenceThreshold) continue;
         // 비율 좌표를 입력 영상의 픽셀 좌표로 바꾸고 영상 경계 안으로 제한한다.
-        const int x1 = std::clamp(static_cast<int>(row[3] * bgr.cols), 0, bgr.cols);
-        const int y1 = std::clamp(static_cast<int>(row[4] * bgr.rows), 0, bgr.rows);
-        const int x2 = std::clamp(static_cast<int>(row[5] * bgr.cols), 0, bgr.cols);
-        const int y2 = std::clamp(static_cast<int>(row[6] * bgr.rows), 0, bgr.rows);
+        const int x1 = std::clamp(static_cast<int>(std::clamp(row[3],0.0f,1.0f) * bgr.cols), 0, bgr.cols);
+        const int y1 = std::clamp(static_cast<int>(std::clamp(row[4],0.0f,1.0f) * bgr.rows), 0, bgr.rows);
+        const int x2 = std::clamp(static_cast<int>(std::clamp(row[5],0.0f,1.0f) * bgr.cols), 0, bgr.cols);
+        const int y2 = std::clamp(static_cast<int>(std::clamp(row[6],0.0f,1.0f) * bgr.rows), 0, bgr.rows);
         if (x2 <= x1 || y2 <= y1)
             continue;
         boxes.emplace_back(x1, y1, x2 - x1, y2 - y1);

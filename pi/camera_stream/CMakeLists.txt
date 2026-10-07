@@ -4,14 +4,15 @@ project(ptz_camera_publisher LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../common/config/edge_config.cmake)
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)
 pkg_check_modules(OPENCV REQUIRED IMPORTED_TARGET opencv4)
 
-add_executable(ptz_camera_publisher src/main.cpp src/person_detector.cpp src/servo_client.cpp src/tracking/target_selector.cpp src/tracking/tracking_controller.cpp)
-target_link_libraries(ptz_camera_publisher PRIVATE PkgConfig::GSTREAMER PkgConfig::OPENCV Threads::Threads)
+add_executable(ptz_camera_publisher src/camera/capture_manager.cpp src/main.cpp src/person_detector.cpp src/servo_client.cpp src/tracking/target_selector.cpp src/tracking/tracking_controller.cpp)
+target_link_libraries(ptz_camera_publisher PRIVATE edge_config PkgConfig::GSTREAMER PkgConfig::OPENCV Threads::Threads)
 target_compile_options(ptz_camera_publisher PRIVATE -Wall -Wextra -Wpedantic)
 
 # 공통 성능 로그 헤더. PTZ_PERF_LOG가 설정된 실행에서만 기록한다.
@@ -22,14 +23,14 @@ target_include_directories(ptz_camera_publisher PRIVATE ${CMAKE_CURRENT_SOURCE_D
 # GPIO나 모델을 열지 않고 자동 추적용 RTSP reader만 유지한다.
 pkg_check_modules(AVFORMAT REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
 add_executable(ptz_capture_lease src/tracking/capture_lease.cpp)
-target_link_libraries(ptz_capture_lease PRIVATE PkgConfig::AVFORMAT Threads::Threads)
+target_link_libraries(ptz_capture_lease PRIVATE edge_config PkgConfig::AVFORMAT Threads::Threads)
 target_compile_options(ptz_capture_lease PRIVATE -Wall -Wextra -Wpedantic)
 
 enable_testing()
 add_executable(tracking_test tests/tracking_test.cpp
     src/tracking/target_selector.cpp src/tracking/tracking_controller.cpp)
 target_include_directories(tracking_test PRIVATE src)
-target_link_libraries(tracking_test PRIVATE PkgConfig::OPENCV)
+target_link_libraries(tracking_test PRIVATE edge_config PkgConfig::OPENCV)
 target_compile_options(tracking_test PRIVATE -UNDEBUG -Wall -Wextra -Wpedantic)
 add_test(NAME tracking COMMAND tracking_test)
 
@@ -43,4 +44,14 @@ if(MEDIAMTX_EXECUTABLE AND FFMPEG_EXECUTABLE AND CURL_EXECUTABLE)
         $<TARGET_FILE:ptz_capture_lease> $<TARGET_FILE:capture_lease_fixture>
         ${MEDIAMTX_EXECUTABLE} ${FFMPEG_EXECUTABLE} ${CURL_EXECUTABLE})
     set_tests_properties(capture_lease PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE)
+endif()
+
+if(MEDIAMTX_EXECUTABLE)
+    add_executable(capture_manager_test tests/capture_manager_test.cpp src/camera/capture_manager.cpp)
+    target_include_directories(capture_manager_test PRIVATE src)
+    target_link_libraries(capture_manager_test PRIVATE edge_config PkgConfig::GSTREAMER PkgConfig::OPENCV)
+    target_compile_options(capture_manager_test PRIVATE -UNDEBUG -Wall -Wextra -Wpedantic)
+    add_test(NAME capture_manager COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/capture_manager_test.sh
+        $<TARGET_FILE:capture_manager_test> ${MEDIAMTX_EXECUTABLE})
+    set_tests_properties(capture_manager PROPERTIES TIMEOUT 20 RUN_SERIAL TRUE)
 endif()

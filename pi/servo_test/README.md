@@ -27,6 +27,8 @@ GPIO는 BCM 번호 기준으로 PAN 18, TILT 19, 버튼 17입니다. 서보 전�
 src/
 ├── main.cpp
 ├── config.h
+├── control/     # ControlArbiter, PtzController
+├── hardware/    # pigpio ServoDriver
 ├── motion/      # 궤적 계산
 ├── servo/       # 각도·펄스 제어
 ├── button/      # 중앙 복귀 버튼
@@ -36,6 +38,23 @@ src/
 ```
 
 각 기능 디렉토리에 같은 이름의 `.h`와 `.cpp`가 함께 있습니다.
+
+## 제어 구조
+
+```mermaid
+flowchart TD
+    TCP[ONVIF·카메라·로컬 키보드 / loopback TCP] --> PROTO[CommandProtocol]
+    PROTO --> ADAPTER[servo_control / 공유 mutex]
+    BUTTON[GPIO17 버튼 / debounce] --> ADAPTER
+    ADAPTER --> ARBITER[ControlArbiter / 수동 우선]
+    ARBITER --> PTZ[PtzController / MotionPlan]
+    PTZ --> DRIVER[PigpioServoDriver]
+    DRIVER --> GPIO[GPIO18 PAN / GPIO19 TILT]
+```
+
+메인 입력 루프는 약 20ms마다 이동 계획을 갱신합니다. pigpio 버튼 콜백과 공유하는
+상태는 mutex로 보호합니다. 최신 소스의 설정·수동 후 자동 복귀 정책은
+[소프트웨어 보고서](../../docs/EDGE_CAMERA_SOFTWARE_REPORT.md)를 참고하세요.
 
 읽을 때는 `main.cpp` → `protocol/command_protocol.cpp` → `servo/servo_control.cpp` 순서로
 따라가면 TCP 명령이 실제 서보 펄스로 이어지는 흐름을 볼 수 있습니다.

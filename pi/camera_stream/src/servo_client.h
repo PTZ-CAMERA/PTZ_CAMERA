@@ -16,6 +16,9 @@ public:
     void move(int panDelta, int tiltDelta);
     void detection(float confidence, int x, int y, int errorX, int errorY);
     void noDetection();
+    void targetState(const std::string& state,std::uint64_t generation);
+    void cameraState(const std::string& state);
+    void streamState(const std::string& state);
 
 private:
     bool connectIfNeeded();

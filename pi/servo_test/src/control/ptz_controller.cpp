@@ -6,6 +6,7 @@
  */
 #include "control/ptz_controller.h"
 #include "config.h"
+#include "runtime/log.h"
 #include "performance/performance_log.h"
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,15 @@
 namespace ptz {
 // 출력 성공 때만 명령 각도를 저장하고 실패를 fault로 남긴다.
 bool PtzController::write(unsigned gpio, int angle, int& current) {
-    if (!driver_.write(gpio, angleToPulseWidth(angle))) {
+    // 마지막 출력 경계에서도 clamp한다. 반전은 같은 기구 범위의 양 끝을 교환한다.
+    const bool pan=gpio==PAN_GPIO;
+    if (!pan && gpio!=TILT_GPIO) { fault_=true; return false; }
+    const int minimum=pan ? PAN_MIN_ANGLE : TILT_MIN_ANGLE;
+    const int maximum=pan ? PAN_MAX_ANGLE : TILT_MAX_ANGLE;
+    angle=std::clamp(angle,minimum,maximum);
+    const bool invert=pan ? edge::appConfig().ptz.invertPan : edge::appConfig().ptz.invertTilt;
+    const int output=invert ? minimum+maximum-angle : angle;
+    if (!driver_.write(gpio, angleToPulseWidth(output))) {
         fault_ = true;
         return false;
     }
@@ -22,7 +31,7 @@ bool PtzController::write(unsigned gpio, int angle, int& current) {
 }
 // 현재 출력 명령 각도를 표시한다. 물리 위치 측정값은 아니다.
 void PtzController::print() const {
-    std::cout << "PAN: " << pan_ << " deg\nTILT: " << tilt_ << " deg\n" << std::flush;
+    edge::log("PTZ","PAN: "+std::to_string(pan_)+" deg TILT: "+std::to_string(tilt_)+" deg");
 }
 // 직접 PAN 입력은 이전 궤적을 취소하고 기구 범위를 제한한다.
 void PtzController::setPan(int angle) {
@@ -39,12 +48,12 @@ void PtzController::setTilt(int angle) {
 // 두 축을 중앙으로 출력한다. 호출자는 동일 mutex를 유지한다.
 void PtzController::center() {
     stop(); fault_ = false;
-    write(PAN_GPIO, 90, pan_); write(TILT_GPIO, 90, tilt_); print();
+    write(PAN_GPIO, edge::appConfig().ptz.panCenter, pan_); write(TILT_GPIO, edge::appConfig().ptz.tiltCenter, tilt_); print();
 }
 // 이미 승인된 상대 보정을 축별 범위 안에서 출력한다.
 void PtzController::adjust(int dx, int dy) {
-    const int pan = std::clamp(pan_ + dx, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-    const int tilt = std::clamp(tilt_ + dy, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
+    const int pan = int(std::clamp(static_cast<long long>(pan_) + dx, static_cast<long long>(PAN_MIN_ANGLE), static_cast<long long>(PAN_MAX_ANGLE)));
+    const int tilt = int(std::clamp(static_cast<long long>(tilt_) + dy, static_cast<long long>(TILT_MIN_ANGLE), static_cast<long long>(TILT_MAX_ANGLE)));
     const bool changed = pan != pan_ || tilt != tilt_;
     if (pan != pan_) write(PAN_GPIO, pan, pan_);
     if (tilt != tilt_) write(TILT_GPIO, tilt, tilt_);
@@ -77,10 +86,10 @@ void PtzController::stop() {
     cancelPlan(motion_); // pulse는 유지한다. 물리적 비상 정지와 다르다.
 }
 // 약 20ms 제어 주기에서 계획을 전진시키고 변한 축만 쓴다.
-void PtzController::update() {
+void PtzController::update(MotionClock::time_point now) {
     if (motion_.mode == MotionPlan::Mode::Idle) return;
     perf::Scope timing("servo_motion_tick");
-    advancePlan(motion_, MotionClock::now());
+    advancePlan(motion_, now);
     const int pan = std::clamp(int(std::lround(motion_.pan)), PAN_MIN_ANGLE, PAN_MAX_ANGLE);
     const int tilt = std::clamp(int(std::lround(motion_.tilt)), TILT_MIN_ANGLE, TILT_MAX_ANGLE);
     const bool changed = pan != pan_ || tilt != tilt_;

@@ -34,6 +34,9 @@ void onSignal(int) {
  * 실행 인자와 자원을 준비한 뒤 위 함수들을 호출한다. 정상/오류 종료를 반환값으로 구분하고 보유 자원을 종료 경로에서 정리한다.
  */
 int main(int argc, char *argv[]) {
+    try { edge::loadDefaultConfig(); } catch (const std::exception& e) {
+        std::cerr << "Config error: " << e.what() << '\n'; return 1;
+    }
     using namespace ptz;
     const bool tcpMode = argc == 2 && std::string(argv[1]) == "--server";
     const bool clientMode = argc == 2 && std::string(argv[1]) == "--client";
@@ -82,6 +85,7 @@ int main(int argc, char *argv[]) {
     // 오류로 종료시키지 않도록 무시하고 SIGTERM 경로에서 GPIO를 정리한다.
     std::signal(SIGCONT, SIG_IGN);
     centerServos();
+    setTrackingEnabled(edge::appConfig().tracking.enabled);
 
     // 터미널의 줄 입력·에코를 끄면 Enter 없이 a/d/w/s/c/q를 받을 수 있다.
     termios savedTerminal{};

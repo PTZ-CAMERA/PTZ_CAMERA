@@ -1,0 +1,19 @@
+{
+  "cameraId": "CAM01",
+  "rtsp": {"port": 8554, "path": "cam"},
+  "network": {"controlPort": 5000},
+  "ptz": {
+    "panPin": 18, "tiltPin": 19, "centerButtonPin": 17,
+    "panCenter": 90, "tiltCenter": 90,
+    "panMin": 25, "panMax": 155, "tiltMin": 40, "tiltMax": 140,
+    "invertPan": false, "invertTilt": false,
+    "targetSpeed": 15, "maxVelocity": 30,
+    "buttonDebounceMs": 80, "buttonGlitchMs": 30
+  },
+  "tracking": {
+    "enabled": false, "detectionWhenDisabled": false,
+    "deadZoneX": 51, "deadZoneY": 29,
+    "lostTimeoutMs": 1000, "maxFrameAgeMs": 600,
+    "manualResumeMs": 1000, "metadataHz": 5
+  }
+}

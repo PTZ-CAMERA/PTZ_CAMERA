@@ -40,14 +40,15 @@ std::size_t discard(char *, std::size_t a, std::size_t b, void *) {
 /**
  * 테스트 계정의 누락/실패/성공 HTTP 상태를 얻는다. 공개 서버의 실제 계정으로 실행하지 않는다.
  */
-long call(const std::string &url, const char *password = nullptr) {
+long call(const std::string &url, const char *password = nullptr, bool json=false) {
     CURL *handle = curl_easy_init();
     assert(handle);
     const std::string xml = "<s:Envelope xmlns:s=\"" + std::string(onvif::SOAP) + "\" xmlns:m=\"" +
                             onvif::MEDIA + "\"><s:Body><m:GetProfiles/></s:Body></s:Envelope>";
-    auto *headers = curl_slist_append(nullptr, "Content-Type: application/soap+xml");
+    const std::string payload=json ? "{\"type\":\"metadata_get\",\"cameraId\":\"CAM01\"}" : xml;
+    auto *headers = curl_slist_append(nullptr, json ? "Content-Type: application/json" : "Content-Type: application/soap+xml");
     curl_easy_setopt(handle, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(handle, CURLOPT_POSTFIELDS, xml.c_str());
+    curl_easy_setopt(handle, CURLOPT_POSTFIELDS, payload.c_str());
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, discard);
     curl_easy_setopt(handle, CURLOPT_TIMEOUT_MS, 3000L);
@@ -153,6 +154,10 @@ int main(int argc, char **argv) {
     assert(call(url) == 401);
     assert(call(url, "wrong-pass") == 401);
     assert(call(url, "test-pass") == 200);
+    const auto custom="http://127.0.0.1:"+std::to_string(port)+"/camera/control";
+    assert(call(custom,nullptr,true)==401);
+    assert(call(custom,"wrong-pass",true)==401);
+    assert(call(custom,"test-pass",true)==200);
     curl_global_cleanup();
     std::cout << "PASS missing/wrong/correct credentials, Digest interoperability, replay and URI "
                  "binding\n";

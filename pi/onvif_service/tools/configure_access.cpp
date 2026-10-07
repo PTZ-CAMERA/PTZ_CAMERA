@@ -7,6 +7,7 @@
  */
 // 비밀번호는 argv/로그에 넣지 않는다. stdin으로 받아 root 전용 파일에 기록한다.
 #include "auth/digest.h"
+#include "config/app_config.h"
 #include <filesystem>
 #include <fstream>
 #include <cctype>
@@ -87,7 +88,11 @@ int main(int argc, char **argv) {
             atomicWrite(path, "username=" + username + "\npassword=" + password + "\n");
             onvif::loadCredentials(path);
             std::cout << "Credentials written to private file (mode 0600)\n";
+        } else if (argc == 3 && std::string(argv[1]) == "--validate-config") {
+            edge::loadAppConfig(argv[2]);
+            std::cout << "Camera configuration valid; no hardware opened\n";
         } else if (argc == 5 && std::string(argv[1]) == "--render-media") {
+            edge::loadDefaultConfig();
             const auto credentials = onvif::loadCredentials(argv[2]);
             std::ifstream file(argv[3]);
             if (!file)
@@ -107,14 +112,25 @@ int main(int argc, char **argv) {
                 base.find("rtspAuthMethods:") != std::string::npos)
                 throw std::runtime_error(
                     "Use base template without generated authentication block");
+            const auto& settings=edge::appConfig();
+            const auto pathKey=base.find("  cam:\n");
+            if (pathKey==std::string::npos) throw std::runtime_error("Expected cam path in base template");
+            base.replace(pathKey,7,"  "+settings.rtspPath+":\n");
+            const auto rtspKey=base.find("rtspAddress:");
+            if (rtspKey==std::string::npos)
+                base="rtspAddress: :"+std::to_string(settings.rtspPort)+"\n"+base;
+            else {
+                const auto end=base.find('\n',rtspKey);
+                base.replace(rtspKey,end==std::string::npos?std::string::npos:end-rtspKey,
+                    "rtspAddress: :"+std::to_string(settings.rtspPort));
+            }
             base += "\n# Generated authentication block. Private file: do not copy into Git.\n"
                     "authMethod: internal\nrtspAuthMethods: [digest]\nauthInternalUsers:\n"
                     "  - user: any\n    pass: ''\n    ips: ['127.0.0.1', '::1']\n    permissions:\n"
-                    "      - action: publish\n        path: cam\n      - action: read\n        "
-                    "path: cam\n      - action: metrics\n"
-                    "  - user: " +
-                    quote(credentials.username) + "\n    pass: " + quote(credentials.password) +
-                    "\n    ips: []\n    permissions:\n      - action: read\n        path: cam\n";
+                    "      - action: publish\n        path: "+settings.rtspPath+
+                    "\n      - action: read\n        path: "+settings.rtspPath+"\n      - action: metrics\n"
+                    "  - user: "+quote(credentials.username)+"\n    pass: "+quote(credentials.password)+
+                    "\n    ips: []\n    permissions:\n      - action: read\n        path: "+settings.rtspPath+"\n";
             atomicWrite(argv[4], base);
             std::cout << "MediaMTX authenticated configuration written (mode 0600)\n";
         } else

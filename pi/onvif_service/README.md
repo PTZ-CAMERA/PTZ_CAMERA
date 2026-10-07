@@ -1,4 +1,40 @@
-# Pi ONVIF 장치 검색·RTSP URL 조회
+# Pi ONVIF Device / Media / PTZ / Events
+
+## 디렉토리와 서비스 구조
+
+```text
+onvif_service/
+├── CMakeLists.txt / install.sh / ptz-onvif.service
+├── src/
+│   ├── main.cpp         # 설정·서비스 시작
+│   ├── network/         # HTTP / UDP discovery
+│   ├── auth/            # HTTP Digest 인증
+│   ├── xml/             # namespace-aware XML 파싱
+│   ├── protocol/        # Device / Media / 요청 dispatch
+│   ├── ptz/             # ONVIF 좌표 검증 → 내부 서보 RPC
+│   ├── events/          # 상태 관측·PullPoint 이벤트
+│   └── control/         # custom JSON 추적 설정·조회
+├── tools/               # Discovery·조회·인증 설정 도구
+└── tests/               # 프로토콜·인증·이벤트 확인
+```
+
+```mermaid
+flowchart LR
+    VMS[PC VMS / ONVIF Client] --> NET[HTTP 8080 / Digest]
+    NET --> XML[XML / Device·Media·PTZ dispatch]
+    XML --> INFO[장치 정보·Profile·RTSP URI]
+    XML --> RPC[PTZ → loopback 서보 RPC]
+    NET --> JSON[custom /camera/control JSON]
+    JSON --> RPC
+    SERVO[서보 서비스 / 상태 관측] --> EVENTS[EventBroker / PullPoint]
+    EVENTS --> VMS
+    DISC[UDP 3702 / WS-Discovery] --> VMS
+```
+
+ONVIF 프로세스는 GPIO나 카메라를 직접 열지 않습니다. 표준 PTZ와 custom 추적
+ON/OFF는 각각 별도 인터페이스이며 상세 계약은
+[최신 보고서](../../docs/EDGE_CAMERA_SOFTWARE_REPORT.md)를 확인하세요.
+아래 Qt 직접 연결 예시는 진단용입니다. 목표 운영 경로는 Qt → VMS → Pi입니다.
 
 Qt가 Pi의 IP/RTSP 경로를 직접 입력하지 않고, LAN에서 Pi를 찾고 영상 주소를 조회하는
 C++17 서비스다. 기존 MediaMTX의 `rtsp://<Pi IP>:8554/cam`을 반환한다.

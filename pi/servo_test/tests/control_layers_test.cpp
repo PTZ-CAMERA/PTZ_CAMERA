@@ -46,9 +46,27 @@ int main() {
     assert(arbiter.startTracking(true,120,100));
     assert(arbiter.requested() && !arbiter.tracking() && controller.status().moving);
     arbiter.manual(); controller.stop(); arbiter.update();
-    assert(!arbiter.requested());
+    assert(arbiter.requested() && !arbiter.tracking());
     assert(arbiter.startTracking(true,101,89));
     assert(arbiter.tracking()); // 현재 명령 위치와 동일한 목표는 즉시 추적 허용.
+    // 가상 시간으로 Stop/timeout 이후 자동 복귀와 오래된 세대 거부를 검증한다.
+    const auto now=MotionClock::now();
+    const auto beforeManual=arbiter.generation();
+    arbiter.manual(now); controller.stop();
+    assert(arbiter.requested() && !arbiter.tracking() && arbiter.mode()==PtzMode::Manual);
+    arbiter.update(now+std::chrono::milliseconds(999)); assert(!arbiter.tracking());
+    arbiter.update(now+std::chrono::milliseconds(1001)); assert(arbiter.tracking());
+    assert(!arbiter.automatic(1,0,beforeManual));
+    arbiter.manual(now); arbiter.enable(false);
+    arbiter.update(now+std::chrono::seconds(10)); assert(!arbiter.tracking() && !arbiter.requested());
+    controller.center(); arbiter.enable(true); arbiter.localCenter(); controller.center();
+    arbiter.update(now+std::chrono::seconds(10)); assert(!arbiter.requested());
+    controller.adjust(std::numeric_limits<int>::max(),std::numeric_limits<int>::min());
+    assert(controller.status().pan==PAN_MAX_ANGLE && controller.status().tilt==TILT_MIN_ANGLE);
+    edge::appConfig().ptz.invertPan=true;
+    controller.setPan(100); assert(driver.pulses[18]==angleToPulseWidth(PAN_MIN_ANGLE+PAN_MAX_ANGLE-100));
+    edge::appConfig().ptz.invertPan=false;
+    controller.setPan(101); controller.setTilt(89); arbiter.enable(true);
     driver.fail=true;
     arbiter.automatic(1,0,arbiter.generation());
     assert(controller.status().fault && controller.status().pan==101 && !arbiter.tracking());

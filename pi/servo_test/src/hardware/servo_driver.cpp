@@ -27,7 +27,8 @@ bool PigpioServoDriver::initialize() {
 }
 // µs pulse를 GPIO에 쓰고 반환값을 확인한다. 호출부의 성능 이벤트도 연결한다.
 bool PigpioServoDriver::write(unsigned gpio, int pulseUs) {
-    if (!initialized_) return false;
+    if (!initialized_ || (gpio!=PAN_GPIO && gpio!=TILT_GPIO) ||
+        (pulseUs!=0 && (pulseUs<1000 || pulseUs>2000))) return false;
     const auto begin = perf::enabled() ? perf::nowNs() : 0;
     const int result = gpioServo(gpio, pulseUs);
     if (perf::enabled())

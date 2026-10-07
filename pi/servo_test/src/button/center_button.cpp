@@ -1,6 +1,6 @@
 /**
  * [학습 안내] GPIO17 중앙 복귀 버튼 입력
- * 내부 pull-up의 active-low 신호에 20ms glitch filter와 200ms 중복 눌림 방지를 적용한다.
+ * 내부 pull-up의 active-low 신호에 설정된 glitch filter와 debounce 중복 눌림 방지를 적용한다.
  * pigpio alert 콜백 스레드에서 실행되므로 debounce 상태와 서보 상태의 잠금 책임을 분리한다.
  * 유효 눌림은 자동 추적/기존 궤적을 취소하고 두 축에 90도 명령을 출력한다.
  * 사용 API의 선언은 include된 헤더에서, 전체 데이터 흐름은 docs/architecture.md에서 확인한다.
@@ -32,7 +32,7 @@ void handleCenterButton(int gpio, int level, uint32_t tick, void *) {
     {
         std::lock_guard<std::mutex> lock(buttonMutex);
         // 부호 없는 뺄셈은 pigpio의 32비트 tick이 순환해도 간격을 계산한다.
-        if (buttonSeen && uint32_t(tick - lastButtonTick) < BUTTON_DEBOUNCE_US) {
+        if (buttonSeen && uint32_t(tick - lastButtonTick) < buttonDebounceUs()) {
             perf::instant("button_debounce_ignored");
             return;
         }
@@ -47,10 +47,10 @@ void handleCenterButton(int gpio, int level, uint32_t tick, void *) {
  * 입력/pull-up/glitch filter/alert callback을 등록하고 API 반환값으로 성공 여부를 보고한다.
  */
 bool configureCenterButton() {
-    // 20ms 글리치 필터 뒤 콜백에서 200ms 중복 눌림을 걸러낸다.
+    // 설정된 글리치 필터 뒤 콜백에서 debounce 중복 눌림을 걸러낸다.
     return gpioSetMode(CENTER_BUTTON_GPIO, PI_INPUT) >= 0 &&
            gpioSetPullUpDown(CENTER_BUTTON_GPIO, PI_PUD_UP) >= 0 &&
-           gpioGlitchFilter(CENTER_BUTTON_GPIO, BUTTON_GLITCH_US) >= 0 &&
+           gpioGlitchFilter(CENTER_BUTTON_GPIO, buttonGlitchUs()) >= 0 &&
            gpioSetAlertFuncEx(CENTER_BUTTON_GPIO, handleCenterButton, nullptr) >= 0;
 }
 

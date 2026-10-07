@@ -7,6 +7,7 @@
  */
 #include "network/server.h"
 #include "auth/digest.h"
+#include "config/app_config.h"
 #include <cstdlib>
 #include <algorithm>
 #include <charconv>
@@ -74,7 +75,10 @@ std::string machineUuid() {
  */
 int main(int argc, char **argv) {
     try {
+        edge::loadDefaultConfig();
         onvif::Config config;
+        config.rtspPort=edge::appConfig().rtspPort;
+        config.servoPort=edge::appConfig().controlPort;
         std::string bind = "0.0.0.0";
         bool allowUnauthenticated = false;
         for (int i = 1; i < argc; ++i) {

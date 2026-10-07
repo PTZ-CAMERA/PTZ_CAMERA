@@ -150,3 +150,18 @@ checks, change, and verification. Add a new dated entry for each incident.
   Renew/Unsubscribe 성공. backend Available=true, 추적 Enabled=false 확인.
   실제 RTSP 한 프레임 디코딩 성공 후 reader 0/notReady로 복귀했다.
 - 후속: 실제 사람 추적·방향·Qt/VMS overlay는 이번 소프트웨어 시험과 구분한다.
+
+## 2026-10-07 — 설정 공유 모듈 연결 중 ONVIF 빌드 오류
+
+- 증상: service.cpp에서 edge namespace를 찾지 못해 빌드가 중단됐다.
+- 원인: RTSP 경로/카메라 ID를 공통 설정으로 전환하면서 설정 헤더 include가 누락됐다.
+- 조치: config/app_config.h를 해당 translation unit에 명시적으로 포함했다.
+- 검증: 후속 ONVIF 빌드와 모의 회귀 시험 결과는 Edge 소프트웨어 구현 기록에 남긴다.
+- 실물 GPIO/설치 서비스는 변경하지 않았다.
+
+## 2026-10-07 — 수동 제어 정책 변경 후 기존 assertion 실패
+
+- 증상: control_layers 모의 시험이 수동 입력 후 requested=false를 기대하며 실패했다.
+- 원인: 이전 계약은 수동 조작 시 추적 요청을 취소했지만, 새 사용자 요구는 요청을 유지하고 출력만 일시 중지한 뒤 자동 복귀하는 것이다.
+- 조치: 해당 기대를 requested=true/autoAllowed=false로 갱신하고, 가상 시각으로 유예 전/후 복귀·명시적 OFF·중앙 취소·이전 세대 폐기 검증을 추가했다.
+- 실제 모터나 운영 서비스는 사용하지 않았다. 최종 시험 결과는 소프트웨어 구현 보고서에 기록한다.

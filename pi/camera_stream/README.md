@@ -7,6 +7,39 @@ Bullseye에서 확인한 구성입니다.
 
 카메라는 한 번만 열고 압축 전 영상을 두 경로로 나눕니다.
 
+## 디렉토리 구조와 최신 처리 흐름
+
+```text
+camera_stream/
+├── CMakeLists.txt / install.sh
+├── mediamtx.yml          # RTSP·demand 실행 설정
+├── src/
+│   ├── main.cpp          # 초기화·분석 worker·종료
+│   ├── camera/           # CaptureManager / 단일 카메라 분기
+│   ├── person_detector.* # MobileNet-SSD / confidence / NMS
+│   ├── servo_client.*    # 내부 IPC와 metadata
+│   └── tracking/         # 대상 선택·추적 보정·capture lease
+├── models/               # 모델·라이선스
+└── tests/                # 캡처·추적 확인 도구
+```
+
+```mermaid
+flowchart LR
+    CAM[libcamerasrc / 단일 소스] --> CAP[CaptureManager / tee]
+    CAP --> ENC[영상 queue / H.264 인코딩]
+    ENC --> MTX[MediaMTX / RTSP → VMS]
+    CAP --> LATEST[최신 분석 프레임]
+    LATEST --> DNN[분석 worker / PersonDetector]
+    DNN --> TARGET[TargetSelector]
+    TARGET --> TRACK[TrackingController / dead zone / LOST]
+    TRACK --> IPC[ServoClient → 서보 서비스]
+```
+
+영상 경로와 분석 worker는 독립적으로 진행합니다. 오래된 분석 프레임은 버리며
+박스를 영상에 그리지 않고 metadata로 전달합니다. 최신 저장소 설정은 Pi WebRTC/HLS를
+끄고 VMS가 WebRTC를 담당합니다. 아래 직접 WebRTC/HLS 연결 안내는 이전 설치 설정의
+진단용이며, 최신 추적 제어 계약은 [보고서](../../docs/EDGE_CAMERA_SOFTWARE_REPORT.md)를 참고하세요.
+
 ```text
 libcamerasrc → tee ┬→ queue → videoconvert → x264enc → h264parse → MediaMTX → Qt 영상
                    └→ 최신 프레임 queue → 640×360·10fps 입력 → MobileNet-SSD → 서보 서비스 → Qt 탐지 정보

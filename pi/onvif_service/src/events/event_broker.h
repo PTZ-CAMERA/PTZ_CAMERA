@@ -18,6 +18,7 @@ public:
     void cancelOwner(unsigned owner);
     void ingest(const std::string& line);
     void setAvailable(bool available);
+    std::string snapshotJson() const;
     std::string expiration(const std::string& token);
 private:
     using Clock=std::chrono::steady_clock;
@@ -29,6 +30,12 @@ private:
     };
     std::map<std::string,Subscription> subscriptions_;
     bool available_=false,camera_=false,tracking_=false;
+    std::string cameraState_="STOPPED",streamState_="STOPPED",targetState_="NO_TARGET",ptzMode_="MANUAL";
+    bool personPresent_=false,autoAllowed_=false,moving_=false,fault_=false;
+    int pan_=90,tilt_=90;
+    std::string metadataJson_="{}";
+    std::string runtimeData_;
+    void transition(const std::string& name);
     std::string detection_="<tt:SimpleItem Name=\"Detected\" Value=\"false\"/>";
     void cleanup();
     Subscription& subscription(const std::string& token);

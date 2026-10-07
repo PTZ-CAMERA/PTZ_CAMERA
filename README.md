@@ -4,6 +4,13 @@ Raspberry Pi 4와 MG90S 서보 두 개로 만든 2축 PTZ 카메라 프로토타
 Pi가 서보를 제어하고 IMX219 카메라 영상을 송출합니다. PC의 Qt UI는 별도
 프로젝트에서 개발합니다. PC Mini VMS는 후속 구현 대상입니다.
 
+## 최신 Edge Camera 구현
+
+설정·대상 상태·수동 후 자동 복귀·독립 JSON 추적 스위치를 추가했다.
+최신 소스/실행 방법과 이전 ONVIF 추적 계약의 차이는
+[소프트웨어 보고서](docs/EDGE_CAMERA_SOFTWARE_REPORT.md)에 정리했다.
+이 변경은 아직 설치 서비스에 반영하지 않았다. 실물 검증은 사용자가 진행한다.
+
 ## 프로젝트 구성
 
 ```text
@@ -26,6 +33,31 @@ PTZ_CAMERA/
 
 현재는 Raspberry Pi만 사용합니다. ESP32 실험 코드와 PC Qt UI 코드는 이 저장소에
 포함하지 않습니다.
+
+## 전체 동작 구조
+
+```mermaid
+flowchart LR
+    CAMERA[Pi Camera] --> CAPTURE[CaptureManager]
+    CAPTURE --> ENCODE[H.264 인코딩]
+    ENCODE --> MTX[MediaMTX / RTSP]
+    MTX --> VMS[PC Mini VMS]
+    VMS --> CLIENT[Qt / Web]
+    CAPTURE --> DNN[PersonDetector]
+    DNN --> TRACK[TrackingController]
+    TRACK --> ARBITER[ControlArbiter]
+    CLIENT --> VMS
+    VMS --> ONVIF[ONVIF PTZ / Control]
+    ONVIF --> ARBITER
+    ARBITER --> PTZ[PtzController]
+    PTZ --> DRIVER[ServoDriver / GPIO18·19]
+    DRIVER --> MOTOR[MG90S 두 축]
+```
+
+구성별 안내: [Pi 서비스](pi/README.md), [통합 빌드](edge-camera/README.md),
+[공통 코드](common/README.md), [문서](docs/README.md), [도구](tools/README.md).
+VMS의 Pi 영상 수신은 사용자가 확인했습니다. 최신 소스는 추적 ON/OFF에
+`/camera/control`을 사용하며 Pi WebRTC/HLS 기본 설정은 OFF입니다.
 
 ## 서보 테스트
 

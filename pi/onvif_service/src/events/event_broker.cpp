@@ -9,6 +9,8 @@
 #include "xml/xml.h"
 #include "metadata/detection_metadata.h"
 #include <openssl/rand.h>
+#include <nlohmann/json.hpp>
+#include "config/app_config.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -99,11 +101,12 @@ EventBroker::Subscription &EventBroker::subscription(const std::string &token) {
 void EventBroker::snapshot(Subscription &sub) {
     const std::vector<Event> events{
         {"Camera/Publishing", eventUtc(), "Initialized",
-         item("Connected", bit(camera_)) + item("Available", bit(available_))},
+         item("Connected", bit(camera_))+item("CameraState",cameraState_)+item("StreamState",streamState_)+item("Available", bit(available_))},
         {"Tracking/State", eventUtc(), "Initialized",
-         item("Enabled", bit(tracking_)) + item("Available", bit(available_))},
+         item("Enabled", bit(tracking_))+item("AutoAllowed",bit(autoAllowed_))+item("TargetState",targetState_)+item("Available", bit(available_))},
         {"Analytics/PersonDetection", eventUtc(), "Initialized",
-         detection_ + item("Available", bit(available_))}};
+         detection_ + item("Available", bit(available_))},
+        {"PTZ/State",eventUtc(),"Initialized",runtimeData_+item("Available",bit(available_))}};
     for (const auto &event : events)
         if (selected(sub.filter, event.topic))
             enqueue(sub.queue, event);
@@ -209,7 +212,8 @@ void EventBroker::setAvailable(bool available) {
         return;
     available_ = available;
     if (!available) {
-        camera_ = false;
+        camera_ = false; cameraState_="ERROR"; streamState_="ERROR";
+        autoAllowed_=false; metadataJson_="{}";
         detection_ = item("Detected", "false");
     }
     publish("Camera/Publishing", item("Connected", bit(camera_)));
@@ -220,25 +224,79 @@ void EventBroker::setAvailable(bool available) {
  * 신뢰한 내부 줄 알림을 읽어 camera/tracking/detection property로 변환한다. detector 수치도 다시 finite/범위 검사한다.
  */
 void EventBroker::ingest(const std::string &line) {
+    if (line.rfind("CAMERA:STATE:",0)==0) {
+        const auto state=line.substr(13);
+        if (state!="STARTING"&&state!="RUNNING"&&state!="ERROR"&&state!="STOPPED") return;
+        cameraState_=state;
+        if (state=="ERROR") streamState_="ERROR";
+        publish("Camera/Publishing",item("Connected",bit(camera_))+item("CameraState",cameraState_)+item("StreamState",streamState_));
+        return;
+    }
+    if (line.rfind("CAMERA:STREAM:",0)==0) {
+        const auto state=line.substr(14);
+        if (state!="STREAMING"&&state!="STOPPED"&&state!="ERROR") return;
+        streamState_=state;
+        publish("Camera/Publishing",item("Connected",bit(camera_))+item("CameraState",cameraState_)+item("StreamState",streamState_));
+        return;
+    }
+    if (line.rfind("TARGET:",0)==0) {
+        const auto state=line.substr(7);
+        if (state!="NO_TARGET"&&state!="ACQUIRED"&&state!="TRACKING"&&state!="LOST"&&state!="ERROR") return;
+        targetState_=state;
+        if ((state=="LOST"||state=="NO_TARGET"||state=="ERROR") && personPresent_) {
+            personPresent_=false; transition("PERSON_LOST");
+        }
+        publish("Tracking/State",item("Enabled",bit(tracking_))+item("AutoAllowed",bit(autoAllowed_))+item("TargetState",targetState_));
+        return;
+    }
+    if (line.rfind("RUNTIME:",0)==0) {
+        int requested=0,allowed=0,fault=0,moving=0,pan=0,tilt=0;
+        unsigned long long generation=0;
+        char mode[16]{},extra=0;
+        if (std::sscanf(line.c_str(),"RUNTIME:%d,%d,%15[^,],%llu,%d,%d,%d,%d%c",
+            &requested,&allowed,mode,&generation,&fault,&moving,&pan,&tilt,&extra)!=8 ||
+            (std::string(mode)!="AUTO"&&std::string(mode)!="MANUAL"&&std::string(mode)!="LOCAL_CENTER")||
+            (requested!=0&&requested!=1)||(allowed!=0&&allowed!=1)||(fault!=0&&fault!=1)||
+            (moving!=0&&moving!=1)||pan<0||pan>180||tilt<0||tilt>180) return;
+        autoAllowed_=allowed!=0; moving_=moving!=0; fault_=fault!=0; pan_=pan; tilt_=tilt; ptzMode_=mode;
+        runtimeData_=item("Mode",ptzMode_)+item("Moving",bit(moving_))+item("Fault",bit(fault_))+
+            item("PanAngle",std::to_string(pan_))+item("TiltAngle",std::to_string(tilt_))+
+            item("Generation",std::to_string(generation));
+        publish("PTZ/State",runtimeData_);
+        publish("Tracking/State",item("Enabled",bit(tracking_))+item("AutoAllowed",bit(autoAllowed_))+item("TargetState",targetState_));
+        return;
+    }
     if (line == "CAMERA:CONNECTED" || line == "CAMERA:DISCONNECTED") {
         const bool camera = line == "CAMERA:CONNECTED";
         if (camera == camera_)
             return;
         camera_ = camera;
-        publish("Camera/Publishing", item("Connected", bit(camera_)));
+        if (!camera_) {
+            if (cameraState_!="ERROR") { cameraState_="STOPPED"; streamState_="STOPPED"; }
+            targetState_="NO_TARGET"; metadataJson_="{}";
+        }
+        publish("Camera/Publishing", item("Connected", bit(camera_))+item("CameraState",cameraState_)+item("StreamState",streamState_));
     } else if (line == "TRACK:ON" || line == "TRACK:OFF") {
         const bool enabled = line == "TRACK:ON";
         if (enabled == tracking_)
             return;
         tracking_ = enabled;
-        publish("Tracking/State", item("Enabled", bit(tracking_)));
+        transition(enabled ? "TRACKING_STARTED" : "TRACKING_STOPPED");
+        if (!enabled) { targetState_="NO_TARGET"; personPresent_=false; metadataJson_="{}"; }
+        publish("Tracking/State", item("Enabled", bit(tracking_))+item("AutoAllowed",bit(autoAllowed_))+item("TargetState",targetState_));
     } else if (line == "NO_DETECTION") {
-        detection_ = item("Detected", "false");
+        detection_ = item("Detected", "false"); metadataJson_="{}";
         publish("Analytics/PersonDetection", detection_);
     } else if (line.rfind("DETECT2:", 0) == 0) {
         const auto metadata = ptz::decodeDetection(std::string_view(line).substr(8));
         if (!metadata) return;
         const auto& d = *metadata;
+        if (!personPresent_) { personPresent_=true; transition("PERSON_DETECTED"); }
+        metadataJson_=nlohmann::json{{"confidence",d.confidence},{"bbox",{{"x",d.boxX},{"y",d.boxY},{"width",d.boxWidth},{"height",d.boxHeight}}},
+            {"errorX",d.errorX},{"errorY",d.errorY},{"pan",d.panAngle},{"tilt",d.tiltAngle},
+            {"frameId",std::to_string(d.frameId)},{"framePtsNs",std::to_string(d.framePtsNs)},
+            {"captureUnixMs",d.captureUnixMs},{"analysisUnixMs",d.analysisUnixMs},
+            {"streamEpoch",std::to_string(d.streamEpoch)}}.dump();
         // UtcTime는 broker 생성 시각이고 CaptureUnixMs는 PTS 기반 추정 UTC다.
         // Profile M의 RTP metadata나 안정적인 ObjectID를 광고하지 않는다.
         detection_ = item("Detected","true") + item("Class","person") +
@@ -272,6 +330,22 @@ void EventBroker::ingest(const std::string &line) {
         publish("Analytics/PersonDetection", detection_);
     }
 }
+// 상태 전환은 일반 property coalescing에 합치지 않는다. 구독별 상한64는 유지한다.
+void EventBroker::transition(const std::string& name) {
+    const Event event{"Runtime/StateEvent",eventUtc(),"",item("Type",name)};
+    cleanup();
+    for (auto& [token,sub]:subscriptions_)
+        if (selected(sub.filter,event.topic)) enqueue(sub.queue,event);
+}
+std::string EventBroker::snapshotJson() const {
+    const auto trackingState=!tracking_ ? "DISABLED" : !autoAllowed_ ? "IDLE" : targetState_=="LOST" ? "LOST" :
+        targetState_=="ACQUIRED"||targetState_=="TRACKING" ? "TRACKING" : "IDLE";
+    return nlohmann::json{{"timestamp",eventUtc()},{"available",available_},
+        {"cameraState",cameraState_},{"streamState",streamState_},{"trackingState",trackingState},
+        {"targetState",targetState_},{"tracking",tracking_},{"autoAllowed",autoAllowed_},
+        {"ptzMode",ptzMode_},{"pan",pan_},{"tilt",tilt_},{"moving",moving_},{"fault",fault_},
+        {"detection",nlohmann::json::parse(metadataJson_)}}.dump();
+}
 /**
  * 표준 WS-Notification/tt:Message 외피와 공개된 vendor topic의 Source/Data를 구성한다.
  */
@@ -279,7 +353,7 @@ std::string eventNotification(const Event &event) {
     return "<wsnt:NotificationMessage><wsnt:Topic "
            "Dialect=\"http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet\">pc:" +
            event.topic + "</wsnt:Topic><wsnt:Message><tt:Message UtcTime=\"" + event.utc +
-           "\" PropertyOperation=\"" + event.operation + "\"><tt:Source>" +
+           "\"" + (event.operation.empty() ? std::string{} : " PropertyOperation=\""+event.operation+"\"") + "><tt:Source>" +
            item("ProfileToken", "main") + "</tt:Source><tt:Data>" + event.data +
            "</tt:Data></tt:Message></wsnt:Message></wsnt:NotificationMessage>";
 }
@@ -303,6 +377,8 @@ std::string topicNamespaceXml() {
            "<wstop:Topic name=\"Camera\"><wstop:Topic name=\"Publishing\"/></wstop:Topic>"
            "<wstop:Topic name=\"Tracking\"><wstop:Topic name=\"State\"/></wstop:Topic>"
            "<wstop:Topic name=\"Analytics\"><wstop:Topic "
-           "name=\"PersonDetection\"/></wstop:Topic></wstop:TopicNamespace>";
+           "name=\"PersonDetection\"/></wstop:Topic>"
+           "<wstop:Topic name=\"PTZ\"><wstop:Topic name=\"State\"/></wstop:Topic>"
+           "<wstop:Topic name=\"Runtime\"><wstop:Topic name=\"StateEvent\"/></wstop:Topic></wstop:TopicNamespace>";
 }
 } // namespace onvif

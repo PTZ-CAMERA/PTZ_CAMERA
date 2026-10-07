@@ -6,6 +6,7 @@
  * 사용 API의 선언은 include된 헤더에서, 전체 데이터 흐름은 docs/architecture.md에서 확인한다.
  */
 #include "protocol/service.h"
+#include "config/app_config.h"
 #include "events/event_service.h"
 #include "events/event_broker.h"
 #include "ptz/ptz_service.h"
@@ -53,7 +54,7 @@ std::string Config::ptzUrl() const {
  * 기존 MediaMTX RTSP URI를 반환한다. 비밀번호를 URI에 넣거나 조회만으로 카메라를 열지 않는다.
  */
 std::string Config::streamUrl() const {
-    return "rtsp://" + ip + ":" + std::to_string(rtspPort) + "/cam";
+    return "rtsp://" + ip + ":" + std::to_string(rtspPort) + "/" + edge::appConfig().rtspPath;
 }
 namespace {
 constexpr const char *ADDRESSING = "http://www.w3.org/2005/08/addressing";
@@ -242,9 +243,21 @@ Response soapResponse(const Config &config, const std::string &path, const std::
         } else if (device && op.name == "GetCapabilities") {
             const auto category = content(op.child(DEVICE, "Category"));
             if (!category.empty() && category != "All" && category != "Media" &&
-                category != "PTZ" && category != "Events")
+                category != "PTZ" && category != "Events" && category != "Device")
                 return fault("Capability category unsupported", "ter:ActionNotSupported");
             result = "<tds:Capabilities>";
+            if (category.empty()||category=="All"||category=="Device")
+                result+="<tt:Device><tt:XAddr>"+escape(config.deviceUrl())+"</tt:XAddr>"
+                    "<tt:Network><tt:IPFilter>false</tt:IPFilter><tt:ZeroConfiguration>false</tt:ZeroConfiguration>"
+                    "<tt:IPVersion6>false</tt:IPVersion6><tt:DynDNS>false</tt:DynDNS></tt:Network>"
+                    "<tt:System><tt:DiscoveryResolve>false</tt:DiscoveryResolve><tt:DiscoveryBye>true</tt:DiscoveryBye>"
+                    "<tt:RemoteDiscovery>false</tt:RemoteDiscovery><tt:SystemBackup>false</tt:SystemBackup>"
+                    "<tt:SystemLogging>false</tt:SystemLogging><tt:FirmwareUpgrade>false</tt:FirmwareUpgrade>"
+                    "<tt:SupportedVersions><tt:Major>2</tt:Major><tt:Minor>0</tt:Minor></tt:SupportedVersions></tt:System>"
+                    "<tt:Security><tt:TLS1.1>false</tt:TLS1.1><tt:TLS1.2>false</tt:TLS1.2>"
+                    "<tt:OnboardKeyGeneration>false</tt:OnboardKeyGeneration><tt:AccessPolicyConfig>false</tt:AccessPolicyConfig>"
+                    "<tt:X.509Token>false</tt:X.509Token><tt:SAMLToken>false</tt:SAMLToken>"
+                    "<tt:KerberosToken>false</tt:KerberosToken><tt:RELToken>false</tt:RELToken></tt:Security></tt:Device>";
             if (category.empty() || category == "All" || category == "Media")
                 result +=
                     "<tt:Media><tt:XAddr>" + escape(config.mediaUrl()) +
@@ -260,6 +273,10 @@ Response soapResponse(const Config &config, const std::string &path, const std::
                           "<tt:WSPullPointSupport>true</"
                           "tt:WSPullPointSupport><tt:WSPausableSubscriptionManagerInterfaceSupport>"
                           "false</tt:WSPausableSubscriptionManagerInterfaceSupport></tt:Events>";
+            if (category.empty()||category=="All")
+                result+="<tt:Extension><pc:CameraControl xmlns:pc=\"urn:ptz-camera:control\"><pc:XAddr>"+
+                    escape(config.baseUrl()+"/camera/control")+"</pc:XAddr><pc:CameraId>"+
+                    escape(edge::appConfig().cameraId)+"</pc:CameraId></pc:CameraControl></tt:Extension>";
             result += "</tds:Capabilities>";
         } else if (device && op.name == "GetScopes") {
             std::istringstream in(scopes);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+#include <string>
 #include <cstdint>
 #include "control/ptz_controller.h"
 
@@ -18,6 +19,8 @@ bool moveServosAutomatically(int panDelta, int tiltDelta, std::uint64_t generati
 std::uint64_t trackingGeneration();
 std::pair<bool, std::uint64_t> trackingState();
 bool isTrackingRequested();
+std::string runtimeStateLine();
+bool stopAutomaticMotion(std::uint64_t generation);
 bool startTargetMove(double pan, double tilt, bool relative);
 bool startVelocityMove(double panVelocity, double tiltVelocity, int timeoutMs);
 void stopServoMotion();

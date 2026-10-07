@@ -3,6 +3,24 @@
 Pi 구성 요소의 통합 CMake 진입점이다. 기존 서비스와 설치 경로를 유지하기 위해 실제
 소스는 현재 `pi/`에 둔다. 같은 코드를 두 곳에 복사하지 않는다.
 
+## 디렉토리와 빌드 구조
+
+```text
+edge-camera/
+├── CMakeLists.txt          # 기존 세 프로젝트를 add_subdirectory로 연결
+├── config/camera.json      # 하드웨어·영상·추적 설정
+└── README.md
+
+통합 CMake
+├── pi/camera_stream → ptz_camera_publisher
+├── pi/servo_test → servo_test
+└── pi/onvif_service → ptz_onvif
+    └── common/config → 공유 설정
+```
+
+통합 빌드는 실행 파일을 만들며 실제 서비스 설치는 각 `pi/*/install.sh`가 담당합니다.
+설치 스크립트는 서비스를 변경할 수 있으므로 소스 빌드와 운영 적용을 구분하세요.
+
 ```sh
 cmake -S edge-camera -B edge-camera/build
 cmake --build edge-camera/build -j2
@@ -25,3 +43,9 @@ ctest --test-dir edge-camera/build --output-on-failure
 `tracking/capture_lease.cpp`는 자동 추적 중에만 내부 RTSP reader를 유지한다.
 
 세부 계약과 검증 조건은 [Pi 구현 기록](../docs/EDGE_CAMERA_IMPLEMENTATION.md)을 참고한다.
+
+## 최신 구현
+
+[Edge Camera 설계](../docs/EDGE_CAMERA_ARCHITECTURE.md)와
+[소프트웨어 변경·VMS 계약·적용 방법](../docs/EDGE_CAMERA_SOFTWARE_REPORT.md)을 참고한다.
+설정 예제는 `config/camera.json`이다. 실제 모터/장시간 검증은 사용자가 진행한다.

@@ -53,7 +53,7 @@ std::string node() {
            "<tt:SupportedPTZSpaces>" +
            spaces() +
            "</tt:SupportedPTZSpaces><tt:MaximumNumberOfPresets>0</tt:MaximumNumberOfPresets>"
-           "<tt:HomeSupported>false</tt:HomeSupported></tptz:PTZNode>";
+           "<tt:HomeSupported>true</tt:HomeSupported></tptz:PTZNode>";
 }
 /**
  * 좌표 문자열 전체를 실수로 파싱하고 finite/-1..1을 확인한다. NaN/Infinity/뒤의 쓰레기 문자를 허용하지 않는다.
@@ -202,14 +202,20 @@ std::string ptzOperation(const Config &config, const Node &op) {
         return ptzConfiguration("tptz:PTZConfiguration");
     if (op.name == "GetPresets")
         return {}; // 프리셋 0개. Home은 광고하지 않는다.
+    if (op.name=="GotoHomePosition") {
+        if (op.child(PTZ,"Speed")) throw std::invalid_argument("Optional Speed unsupported");
+        accepted(config,"ONVIF:ABS:"+std::to_string(edge::appConfig().ptz.panCenter)+","+
+                         std::to_string(edge::appConfig().ptz.tiltCenter));
+        return {};
+    }
     if (op.name == "MoveAndStartTracking") {
         for (const auto *unsupported : {"PresetToken", "GeoLocation", "ObjectID", "Speed"})
             if (op.child(PTZ, unsupported))
                 throw std::invalid_argument("Tracking supports only current position or PTZVector");
         if (const auto *target = op.child(PTZ, "TargetPosition")) {
             const auto [x, y] = vector(*target, POSITION_SPACE);
-            accepted(config, "ONVIF:MOVE_TRACK:" + std::to_string(g::panMid + x * g::panRange / 2) +
-                                 "," + std::to_string(g::tiltMid + y * g::tiltRange / 2));
+            accepted(config, "ONVIF:MOVE_TRACK:" + std::to_string(g::panMid() + x * g::panRange() / 2) +
+                                 "," + std::to_string(g::tiltMid() + y * g::tiltRange() / 2));
         } else
             accepted(config, "ONVIF:TRACK");
         return {};
@@ -229,8 +235,8 @@ std::string ptzOperation(const Config &config, const Node &op) {
         char stamp[32];
         std::strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
         return "<tptz:PTZStatus><tt:Position><tt:PanTilt x=\"" +
-               std::to_string((pan - g::panMid) / (g::panRange / 2)) + "\" y=\"" +
-               std::to_string((tilt - g::tiltMid) / (g::tiltRange / 2)) + "\" space=\"" +
+               std::to_string((pan - g::panMid()) / (g::panRange() / 2)) + "\" y=\"" +
+               std::to_string((tilt - g::tiltMid()) / (g::tiltRange() / 2)) + "\" space=\"" +
                POSITION_SPACE + "\"/></tt:Position><tt:MoveStatus><tt:PanTilt>" +
                (fault    ? "UNKNOWN"
                 : moving ? "MOVING"
@@ -265,11 +271,11 @@ std::string ptzOperation(const Config &config, const Node &op) {
                                                                         : VELOCITY_SPACE);
         std::string command;
         if (op.name == "AbsoluteMove")
-            command = "ONVIF:ABS:" + std::to_string(g::panMid + x * g::panRange / 2) + "," +
-                      std::to_string(g::tiltMid + y * g::tiltRange / 2);
+            command = "ONVIF:ABS:" + std::to_string(g::panMid() + x * g::panRange() / 2) + "," +
+                      std::to_string(g::tiltMid() + y * g::tiltRange() / 2);
         else if (op.name == "RelativeMove")
-            command = "ONVIF:REL:" + std::to_string(x * g::panRange) + "," +
-                      std::to_string(y * g::tiltRange);
+            command = "ONVIF:REL:" + std::to_string(x * g::panRange()) + "," +
+                      std::to_string(y * g::tiltRange());
         else
             command = "ONVIF:VEL:" + std::to_string(x * g::maxVelocity) + "," +
                       std::to_string(y * g::maxVelocity) + "," +

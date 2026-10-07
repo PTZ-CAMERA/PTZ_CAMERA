@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
     assert(currentPanAngle() == 90 && currentTiltAngle() == 90 && !isTrackingEnabled());
     setPanAngle(100);
     setTrackingEnabled(true);
-    handleCenterButton(17, 0, 1100000, nullptr);
+    handleCenterButton(17, 0, 1040000, nullptr);
     assert(currentPanAngle() == 100 && isTrackingEnabled());
     handleCenterButton(17, 0, 1300000, nullptr);
     assert(currentPanAngle() == 90 && !isTrackingEnabled());

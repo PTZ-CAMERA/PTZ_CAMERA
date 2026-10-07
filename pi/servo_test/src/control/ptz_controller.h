@@ -15,7 +15,7 @@ public:
     bool target(double pan, double tilt, bool relative);
     bool velocity(double panVelocity, double tiltVelocity, int timeoutMs);
     void stop();
-    void update();
+    void update(MotionClock::time_point now=MotionClock::now());
     ServoMotionStatus status() const;
     std::pair<int,int> angles() const { return {pan_, tilt_}; }
 private:

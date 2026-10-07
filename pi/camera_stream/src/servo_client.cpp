@@ -7,6 +7,7 @@
  */
 #include "performance/performance_log.h"
 #include "servo_client.h"
+#include "config/app_config.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -17,7 +18,7 @@
 #include <sstream>
 
 namespace {
-constexpr uint16_t kServoPort = 5000;
+unsigned servoPort() { return static_cast<unsigned>(edge::appConfig().controlPort); }
 }
 
 /**
@@ -51,7 +52,7 @@ bool ServoClient::connectIfNeeded() {
     setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     sockaddr_in address{};
     address.sin_family = AF_INET;
-    address.sin_port = htons(kServoPort);
+    address.sin_port = htons(servoPort());
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (connect(fd_, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0) {
         // 단순한 상태 조회 연결과 실제 카메라 송출기를 구별한다.
@@ -167,4 +168,16 @@ void ServoClient::move(int pan, int tilt, std::uint64_t generation) {
 // bbox/시각은 압축 영상과 별도로 전송한다. SOAP 변환은 ONVIF 서비스가 담당한다.
 void ServoClient::detection(const ptz::DetectionMetadata& metadata) {
     sendLine("AUTO:DETECT2:" + ptz::encodeDetection(metadata));
+}
+
+// 상태는 변할 때만 worker가 호출한다. 이동보다 별도로 처리되는 메타데이터다.
+void ServoClient::targetState(const std::string& state,std::uint64_t generation) {
+    sendLine("AUTO:TARGET:"+state+","+std::to_string(generation));
+}
+void ServoClient::cameraState(const std::string& state) {
+    sendLine("CAMERA:STATE:"+state);
+}
+
+void ServoClient::streamState(const std::string& state) {
+    sendLine("CAMERA:STREAM:"+state);
 }
