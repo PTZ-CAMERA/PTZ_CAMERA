@@ -31,3 +31,9 @@ docs/
 
 문제 조사 기록은 루트의 [troubleshotting.md](../troubleshotting.md)에 있습니다.
 실물 검증과 장시간 시험은 사용자 수행 대상으로 남아 있습니다.
+
+## 현재 시스템 연동 기준 (2026-10-11)
+
+Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
+
+최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../README.md)를 기준으로 확인하세요.

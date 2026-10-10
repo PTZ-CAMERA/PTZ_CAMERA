@@ -91,7 +91,7 @@ sudo systemctl start ptz-servo.service
 
 ## Qt ONVIF PTZ와 내부 TCP
 
-Qt의 이동 버튼과 키보드 제어는 인증된 ONVIF PTZ API를 사용한다.
+Qt의 이동 버튼·키보드는 VMS에 명령을 보내고 VMS가 인증된 ONVIF PTZ로 전달한다.
 [Qt 변경 요청서](../../docs/onvif_ptz_qt_migration.md)에 endpoint, 좌표, 요청 예시가 있다.
 외부 `PTZ:LEFT/RIGHT/UP/DOWN/CENTER`는 이제 거부한다.
 
@@ -110,7 +110,7 @@ Pi 내부 키보드 클라이언트는 기존 PTZ 명령을 사용한다. TCP 50
 GPIO 출력을 담당한다. `servo_control`은 이 객체들의 공유 mutex와 adapter다. 약 20ms마다 목표를 갱신하며 절대/상대 이동은 15°/s, 연속 이동은 축별
 최대 30°/s이다. 연속 이동은 명령 Timeout(최대 5초), Stop 또는 경계에서 중단된다.
 
-중앙 버튼·로컬 키·수동 ONVIF 명령은 자동 추적을 해제한다. TRACK:ON은 기존 수동
+최신 소스에서 중앙 버튼·로컬 키·수동 ONVIF 명령은 수동 제어를 우선하며 추적 설정 ON이면 유예 후 AUTO로 복귀할 수 있다. TRACK:ON은 기존 수동
 궤적을 취소한다. Stop은 펄스를 끄지 않고 마지막 명령 위치를 유지한다.
 상태는 출력 명령 기준이며 실물 위치나 기계적 정지 완료를 측정하지 않는다.
 
@@ -132,6 +132,12 @@ ONVIF 로그에서 HTTP 상태와 인증 결과를, 서보 로그에서 ONVIF �
 
 ## 최신 Edge 계약
 
-TCP 5000은 loopback 전용이다. 외부 자동 추적은 ONVIF MoveAndStartTracking/Stop,
+TCP 5000은 loopback 전용이다. 최신 외부 추적 설정은 /camera/control tracking_set/get이며 기존 ONVIF MoveAndStartTracking은 호환 경로다.
 알림은 PullPoint를 사용한다. v2 명령·모드 세대·클래스 경계와 검증은
 [Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)에 정리했다.
+
+## 현재 시스템 연동 기준 (2026-10-11)
+
+Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
+
+최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.

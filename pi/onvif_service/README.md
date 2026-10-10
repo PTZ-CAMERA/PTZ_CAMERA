@@ -212,8 +212,8 @@ Media 프로파일의 PTZConfiguration은 `ptz-config`, node는 `ptz-node`다.
 - 지원: GetNodes/GetNode, GetConfigurations/GetConfiguration/GetConfigurationOptions,
   GetCompatibleConfigurations, GetServiceCapabilities, GetStatus, AbsoluteMove,
   RelativeMove, ContinuousMove, Stop, GetPresets(빈 목록).
-- Pan/Tilt 좌표/변위/속도는 -1..1. Zoom/Home/프리셋/optional Speed는 미지원이다.
-- Continuous Timeout은 0.1..5초, 기본 1초. 새 수동 명령은 자동 추적을 해제한다.
+- Pan/Tilt 좌표/변위/속도는 -1..1. Zoom/프리셋/optional Speed는 미지원이며 최신 소스는 GotoHomePosition을 제공한다.
+- Continuous Timeout은 0.1..5초, 기본 1초. 최신 소스의 수동 명령은 수동 제어를 우선하며 사용자 추적 ON이면 유예 후 AUTO 복귀할 수 있다.
 - 단일 GPIO 소유자인 서보 서비스에 loopback RPC로 전달한다. RPC 전체 기한은 300ms다.
 - 상태 위치는 명령 각도이며 실제 엔코더 측정값이 아니다. Stop은 목표 갱신을 멈추고
   마지막 펄스를 유지한다. 물리적 비상정지 기능은 아니다.
@@ -227,14 +227,14 @@ sudo env PTZ_CREDENTIALS_FILE=/etc/ptz-camera/access.conf \
 ```
 
 `--zero-test`는 현재 명령 위치로 AbsoluteMove, 0변위 RelativeMove, 0속도 ContinuousMove,
-Stop을 보내 연결 경로를 확인한다. 수동 제어이므로 자동 추적은 해제한다.
+Stop을 보내 연결 경로를 확인한다. 수동 제어 상태가 바뀔 수 있으므로 실물 시험으로 취급한다. 최신 소스의 추적 설정 OFF는 독립 JSON API로 수행한다.
 실제 비영 이동 방향과 다른 ONVIF 클라이언트 호환성은 추가 현장 확인이 필요하다.
 
 Qt 구현 요청서와 XML 예시는 [PTZ 전환 문서](../../docs/onvif_ptz_qt_migration.md)에 있다.
 
 ## ONVIF 추적과 Events
 
-MoveAndStartTracking/Stop과 Events/PullPoint를 운영 서비스에 적용했다.
+기존 운영 버전에서 MoveAndStartTracking/Stop과 Events/PullPoint를 사용했다. 최신 소스의 독립 추적 스위치와 Stop 동작은 배포 버전에 따라 구분한다.
 bbox·시각·프레임 식별자·제조사 topic 및 제한은
 [Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)에 정리했다.
 
@@ -244,3 +244,9 @@ PTZ_CREDENTIALS_FILE=/etc/ptz-camera/access.conf ./build/onvif_events_check \
 ```
 
 이 도구는 구독/초기 알림/갱신/해제를 확인하며 이동이나 추적 시작은 요청하지 않는다.
+
+## 현재 시스템 연동 기준 (2026-10-11)
+
+Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
+
+최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.

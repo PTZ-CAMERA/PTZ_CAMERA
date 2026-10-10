@@ -18,6 +18,8 @@ pi/
 flowchart LR
     CAMERA[카메라 송출기] --> MTX[MediaMTX / RTSP 8554]
     MTX --> VMS[PC VMS]
+    MTX -->|직접 RTSP| QT[Qt 라이브]
+    VMS -->|내장 WebRTC| WEB[Web Browser]
     CAMERA -->|자동 이동·metadata| SERVO[서보 서비스 / loopback 5000]
     VMS -->|ONVIF / HTTP 8080| ONVIF[ONVIF 서비스]
     ONVIF -->|수동 PTZ·추적 설정| SERVO
@@ -32,3 +34,9 @@ flowchart LR
 
 설치·실행: [카메라](camera_stream/README.md), [서보](servo_test/README.md),
 [ONVIF](onvif_service/README.md). 통합 빌드는 [edge-camera](../edge-camera/README.md)에 있습니다.
+
+## 현재 시스템 연동 기준 (2026-10-11)
+
+Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
+
+최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../README.md)를 기준으로 확인하세요.

@@ -2,7 +2,7 @@
 
 Pi의 C++17 송출기(`src/main.cpp`)가 GStreamer 라이브러리로 IMX219 영상을
 캡처하고 H.264로 인코딩하여 MediaMTX에 RTSP로 발행합니다. MediaMTX가
-같은 영상을 RTSP, WebRTC, HLS로 제공합니다. Raspberry Pi 4 / Raspberry Pi OS
+현재 구성에서는 H.264를 Pi MediaMTX의 RTSP로 제공합니다. WebRTC는 PC VMS가 담당하며 Pi WebRTC/HLS는 기본 비활성입니다. Raspberry Pi 4 / Raspberry Pi OS
 Bullseye에서 확인한 구성입니다.
 
 카메라는 한 번만 열고 압축 전 영상을 두 경로로 나눕니다.
@@ -55,12 +55,12 @@ libcamerasrc → tee ┬→ queue → videoconvert → x264enc → h264parse →
 | `models/` | 다운로드한 모델 정의·가중치·라이선스. 큰 가중치 파일은 Git에서 제외 |
 | `fetch_model.sh` | 고정한 원본 버전의 모델을 내려받고 SHA-256 확인 |
 
-탐지기는 ONVIF `MoveAndStartTracking`으로 추적을 켠 동안 추론합니다.
+탐지 실행은 적용된 Tracking 설정과 detectionWhenDisabled에 따릅니다. 최신 소스는 독립 /camera/control 추적 스위치를 제공하고 기존 ONVIF 시작 명령도 호환 경로로 유지합니다.
 내부 capture lease가 추적 중 영상을 유지하므로 시청자 접속이 필수는 아닙니다.
 10fps는 탐지기에 공급하는 영상의 상한이며 신경망 추론 속도는 Pi의 CPU 상태에
 따라 달라집니다. 분석 경로는 대기 중인 오래된 프레임을 버리고 최신 프레임만
 유지합니다. 현재 OpenCV DNN은 2개 스레드를 사용합니다.
-ONVIF `Stop`, 수동 명령 또는 중앙 버튼은 자동 추적을 해제합니다.
+최신 소스의 Stop·수동 명령은 수동 계획을 중재하며 추적 설정 ON이면 유예 후 AUTO로 복귀할 수 있습니다. 추적 설정 OFF는 독립 tracking_set(false)를 사용합니다.
 사람을 놓치면 현재 위치에서 멈추고 ONVIF 탐지 이벤트에 Detected=false를 전달합니다.
 
 MediaMTX는 카메라 드라이버나 인코더가 아니라 영상 서버입니다. C++ 송출기가
@@ -167,3 +167,9 @@ journalctl -u ptz-camera-watchdog.service -n 20
 대상 선택/이동 계산은 `src/tracking/`, GPIO 정책/계획/출력은 서보 프로젝트의
 `control/`과 `hardware/`로 분리했다. v2 bbox/시각/세대와 시험 조건은
 [Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)을 참고한다.
+
+## 현재 시스템 연동 기준 (2026-10-11)
+
+Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
+
+최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.
