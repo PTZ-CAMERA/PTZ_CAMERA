@@ -1,11 +1,21 @@
 # Raspberry Pi 카메라 송출
 
+[문서 안내](../../docs/README.md) · [전체 구조](../../docs/SYSTEM_ARCHITECTURE.md) · [Pi 현재 구조](../../docs/EDGE_CAMERA_ARCHITECTURE.md)
+
 Pi의 C++17 송출기(`src/main.cpp`)가 GStreamer 라이브러리로 IMX219 영상을
-캡처하고 H.264로 인코딩하여 MediaMTX에 RTSP로 발행합니다. MediaMTX가
-현재 구성에서는 H.264를 Pi MediaMTX의 RTSP로 제공합니다. WebRTC는 PC VMS가 담당하며 Pi WebRTC/HLS는 기본 비활성입니다. Raspberry Pi 4 / Raspberry Pi OS
+캡처하고 H.264로 인코딩하여 Pi MediaMTX에 RTSP로 발행합니다. WebRTC는 PC VMS가 담당합니다.
+저장소 기본 설정은 Pi WebRTC/HLS를 끄지만 기존 설치 설정은 다를 수 있습니다. Raspberry Pi 4 / Raspberry Pi OS
 Bullseye에서 확인한 구성입니다.
 
 카메라는 한 번만 열고 압축 전 영상을 두 경로로 나눕니다.
+
+## 현재 분석·제어 경로
+
+`HybridPersonTracker`는 DNN 검출 사이 KCF로 위치를 갱신합니다. `TrackingFeedback`은
+화면 중심 오차와 접수된 이동 이력을 사용합니다. 새 ONVIF 탐지 metadata는 실제 DNN
+결과에만 연결하며 KCF 갱신을 새 confidence 측정으로 기록하지 않습니다.
+`ServoClient`는 AUTO:MOVE2 응답 ACK/REJECT를 소비해 다음 상태 조회와 섞이지 않게 합니다.
+[구조·제한·배포 차이](../../docs/EDGE_CAMERA_ARCHITECTURE.md)
 
 ## 디렉토리 구조와 최신 처리 흐름
 
@@ -30,8 +40,9 @@ flowchart LR
     ENC --> MTX[MediaMTX / RTSP → VMS]
     CAP --> LATEST[최신 분석 프레임]
     LATEST --> DNN[분석 worker / PersonDetector]
-    DNN --> TARGET[TargetSelector]
-    TARGET --> TRACK[TrackingController / dead zone / LOST]
+    DNN --> HYBRID[HybridPersonTracker / KCF 위치 갱신]
+    HYBRID --> TARGET[TargetSelector]
+    TARGET --> TRACK[TrackingController / PD·deadband·접수 이동 보상]
     TRACK --> IPC[ServoClient → 서보 서비스]
 ```
 
@@ -167,9 +178,3 @@ journalctl -u ptz-camera-watchdog.service -n 20
 대상 선택/이동 계산은 `src/tracking/`, GPIO 정책/계획/출력은 서보 프로젝트의
 `control/`과 `hardware/`로 분리했다. v2 bbox/시각/세대와 시험 조건은
 [Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)을 참고한다.
-
-## 현재 시스템 연동 기준 (2026-10-11)
-
-Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
-
-최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.

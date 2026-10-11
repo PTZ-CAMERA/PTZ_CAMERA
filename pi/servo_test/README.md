@@ -1,5 +1,7 @@
 # Raspberry Pi 서보 제어
 
+[문서 안내](../../docs/README.md) · [전체 구조](../../docs/SYSTEM_ARCHITECTURE.md) · [Pi 현재 구조](../../docs/EDGE_CAMERA_ARCHITECTURE.md)
+
 `servo_test`는 MG90S PAN/TILT 두 축과 중앙 복귀 버튼을 pigpio C API로 제어합니다.
 GPIO는 BCM 번호 기준으로 PAN 18, TILT 19, 버튼 17입니다. 서보 전원은 외부
 4.8~6V에서 공급하고 Pi GND와 외부 전원 GND를 공통 연결합니다.
@@ -136,8 +138,9 @@ TCP 5000은 loopback 전용이다. 최신 외부 추적 설정은 /camera/contro
 알림은 PullPoint를 사용한다. v2 명령·모드 세대·클래스 경계와 검증은
 [Pi 구현 기록](../../docs/EDGE_CAMERA_IMPLEMENTATION.md)에 정리했다.
 
-## 현재 시스템 연동 기준 (2026-10-11)
+## 자동 이동 계약과 단위
 
-Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
-
-최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.
+`common/control/tracking_limits.h`의 1회 보정 한도(현재 ±6°)를 송신·수신이 공유합니다.
+`AUTO:MOVE2`의 세대를 검사한 뒤 ACK/REJECT를 반환합니다. ACK는 명령 접수이며
+물리 모터 도착 측정이 아닙니다. 수동 ContinuousMove의 정규화 속도와 자동 추적의
+보정 각도는 서로 다른 단위입니다.

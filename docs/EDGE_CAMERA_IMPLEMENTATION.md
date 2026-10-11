@@ -1,3 +1,5 @@
+> 과거 설계/구현 기록입니다. 현재 작업 트리와 배포 차이는 [현재 구조](EDGE_CAMERA_ARCHITECTURE.md), [전체 시스템](SYSTEM_ARCHITECTURE.md)을 우선 확인하세요.
+
 # Pi Edge Camera 구현 기록
 
 작성일: 2026-10-07. 목표 구조는 [PROJECT_ARCHITECTURE](PROJECT_ARCHITECTURE.md)를 참고한다.

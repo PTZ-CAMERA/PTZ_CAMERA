@@ -1,5 +1,7 @@
 # 처리 구조와 자원 사용량 측정
 
+[문서 안내](../../docs/README.md) · [전체 구조](../../docs/SYSTEM_ARCHITECTURE.md) · [Pi 현재 구조](../../docs/EDGE_CAMERA_ARCHITECTURE.md)
+
 향후 작업: [CPU 코어 배치별 실제 스트리밍 비교 계획](cpu_affinity_plan.md).
 
 목적은 Raspberry Pi 4의 **영상 송출·탐지 분리, 순차 추론, 이벤트 루프, 추론 스레드 수**를
@@ -198,9 +200,3 @@ ctest --test-dir tools/performance/build --output-on-failure
 `servo_logging_test`는 가짜 pigpio 함수로 각도 제한, 자동/수동 제어, 버튼 debounce,
 키 입력, 종료 시 펄스 중지와 로그의 부모 이벤트 연결을 검증한다. 실물 PWM 파형이나
 기계적 회전의 정확성을 검증하는 시험은 아니다.
-
-## 현재 시스템 연동 기준 (2026-10-11)
-
-Qt 라이브는 Pi 직접 RTSP, Web 라이브는 PC VMS 내부 libdatachannel WebRTC입니다. PC MediaMTX 게이트웨이는 제거했고 Pi RTSP 서버는 유지합니다. 녹화·SQLite·자연어 검색은 VMS 책임입니다.
-
-최신 Pi 소스의 독립 /camera/control 추적 설정과 VMS의 기존 ONVIF Tracking 계약은 아직 맞춰야 합니다. 소스 업데이트가 설치 서비스 적용을 의미하지 않습니다. 전체 역할·검증 범위는 [저장소 README](../../README.md)를 기준으로 확인하세요.

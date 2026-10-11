@@ -13,7 +13,7 @@
 
 ## 읽는 순서
 
-CaptureManager → PersonDetector/TargetSelector → TrackingController → ServoClient → ControlArbiter → PtzController/ServoDriver → EventBroker 순서로 흐름을 확인한다.
+CaptureManager → PersonDetector/HybridPersonTracker/TargetSelector → TrackingController/TrackingFeedback → ServoClient → ControlArbiter → PtzController/ServoDriver → EventBroker 순서로 흐름을 확인한다.
 
 ## 유지 규칙
 
@@ -26,3 +26,10 @@ CaptureManager → PersonDetector/TargetSelector → TrackingController → Serv
 기존 학습 주석에 책임·단위·수명 설명을 보완했다. C++에서 주석/공백을 제거한 토큰 비교로 변경 전후 로직 동일성을 확인한다. 발열과 물리 장치 영향을 피하기 위해 이번 정리에서 Pi 빌드·서비스 재시작·모터 시험은 실행하지 않는다.
 
 [프로젝트 README](../README.md) · [배포·제어 계약](EDGE_CAMERA_SOFTWARE_REPORT.md)
+
+## 최근 코드 읽기 주의점
+
+KCF의 위치 갱신은 새 DNN confidence가 아니다. freshDetection에서만 탐지 metadata를
+발행하고 제어 보상은 AUTO:MOVE2 ACK가 확인된 이력만 사용한다. 현재 기본 ki=0이므로
+PD 제어로 설명한다. 보상 계수는 실물 화각·지연에 맞춰 추가 조정할 초기값이다.
+[문서 안내](README.md) · [현재 구조](EDGE_CAMERA_ARCHITECTURE.md)

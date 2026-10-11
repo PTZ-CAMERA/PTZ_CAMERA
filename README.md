@@ -1,5 +1,7 @@
 # Edge AI PTZ Camera
 
+[문서 안내](docs/README.md) · [전체 구조](docs/SYSTEM_ARCHITECTURE.md) · [Pi 현재 구조](docs/EDGE_CAMERA_ARCHITECTURE.md)
+
 Raspberry Pi 4에서 카메라 캡처·사람 탐지·자동 추적·PAN/TILT GPIO 제어·RTSP·ONVIF를 제공하는 C++17 프로젝트입니다. PC의 Mini VMS, Qt, Web은 별도 저장소이며 이미 구현되어 연동 검증을 진행하고 있습니다.
 
 ## 전체 시스템
@@ -15,9 +17,10 @@ flowchart LR
     Qt <-->|HTTP / WebSocket| VMS
     Web <-->|WebSocket / SDP·제어·검색| VMS
     Capture --> DNN["OpenCV DNN / MobileNet-SSD"]
-    DNN --> Tracking["TargetSelector / TrackingController"]
+    DNN --> Hybrid["HybridPersonTracker / KCF 위치 갱신"]
+    Hybrid --> Tracking["TrackingController / PD·접수 이동 보상"]
     Tracking --> Arbiter["ControlArbiter"]
-    VMS -->|ONVIF·JSON control| Onvif["HTTP :8080 / Digest"]
+    VMS -->|ONVIF / 현재 연동| Onvif["HTTP :8080 / Digest"]
     Onvif --> Arbiter
     Arbiter --> PTZ["PtzController / ServoDriver"]
     PTZ --> GPIO["pigpio / GPIO18 PAN / GPIO19 TILT"]
@@ -52,23 +55,13 @@ tools/                # 설치/진단 보조 및 성능 측정 도구
 docs/                 # 설계·제어 계약·배포 차이·시험·작업 기록
 ```
 
-사용 기술: C++17, CMake, Raspberry Pi OS/Linux, libcamera/GStreamer/x264, OpenCV DNN, pigpio, ONVIF, HTTP Digest, Expat, OpenSSL, nlohmann_json, MediaMTX(RTSP).
+사용 기술: C++17, CMake, Raspberry Pi OS/Linux, libcamera/GStreamer/x264, OpenCV DNN/KCF, pigpio, ONVIF, HTTP Digest, Expat, OpenSSL, nlohmann_json, MediaMTX(RTSP).
 
 ## 영상·메타데이터
 
 캡처 영상은 인코딩 경로와 분석 경로로 나눕니다. 분석 경로는 오래된 대기 프레임을 버리고 최신 프레임을 사용하며, bbox는 영상에 직접 그리지 않고 메타데이터로 전달합니다.
 
 사람 탐지 여부·confidence·bbox·기준 영상 크기·추적 상태·명령 각도 및 제공 가능한 frameId/streamEpoch/프레임·분석 시각을 ONVIF Events로 전달합니다. 필드가 없는 상태에는 임의의 값을 만들지 않습니다. Capture 시각은 PTS 기반 추정 UTC이며 센서 노출 시각을 보장하지 않습니다. pan/tilt는 명령 각도이고 실제 모터 도착 센서값이 아닙니다. 제조사 확장 Events를 사용하며 ONVIF Profile M 전체 인증을 주장하지 않습니다.
-
-## 추적 제어 버전과 VMS 호환성
-
-**최신 저장소 소스와 설치된 Pi 서비스의 버전이 다를 수 있습니다.** 이번 README 정리는 서비스를 설치·재시작하거나 모터를 구동하지 않습니다.
-
-최신 Pi 소스는 독립 HTTP Digest JSON /camera/control의 tracking_set/get을 제공합니다. 표준 ONVIF MoveAndStartTracking은 호환 경로로 유지하지만 Stop은 수동 계획을 멈추고 사용자 추적 ON이면 유예 후 AUTO로 복귀할 수 있습니다. 추적 설정 자체를 OFF로 바꾸려면 tracking_set(false)를 사용합니다.
-
-현재 VMS 코드는 기존 MoveAndStartTracking/Stop 기반 Tracking ON/OFF를 사용합니다. **최신 Pi의 독립 JSON 추적 스위치 adapter는 VMS에 아직 연결되지 않았습니다.** 따라서 최신 소스를 배포할 때 VMS도 해당 계약에 맞추고 실제 OFF 동작을 확인해야 합니다. 현재 VMS 자동 녹화는 확인된 Tracking ON에서 사람 탐지 시 시작하는 정책입니다.
-
-최신 API·설정·배포 방법은 [EDGE_CAMERA_SOFTWARE_REPORT](docs/EDGE_CAMERA_SOFTWARE_REPORT.md)를 기준으로 확인하세요. 예전 날짜별 문서는 당시 구현 기록입니다.
 
 ## 빌드와 서비스
 
@@ -105,12 +98,6 @@ systemctl status ptz-camera.service ptz-servo.service ptz-onvif.service
 인증은 private 설정 파일을 사용하며 계정·비밀번호를 저장소나 로그에 포함하지 않습니다. VMS도 서버 로컬 설정에서 계정을 읽습니다. 실제 IP는 hostname -I로 확인합니다.
 
 MG90S 서보 전원은 외부 4.8~6V, Pi GND와 공통 접지하며 GPIO는 신호선으로 사용합니다. 범위와 중앙은 적용 JSON 설정을 확인합니다. 직접 서보 진단은 [servo_test README](pi/servo_test/README.md)의 절차를 따릅니다.
-
-## 검증 범위와 남은 작업
-
-Pi 소스의 단위·모의 시험 결과와 설치 바이너리·실물 결과를 구분합니다. VMS에서 ONVIF 연결·Events 수신·메타데이터 저장을 확인했고, 실제 Gemini 조건 변환·모의 탐지 자동 녹화·Qt 합성 파일 재생·VMS 내장 WebRTC 브라우저 재생을 검증했습니다.
-
-실제 사람 탐지→자동 녹화→자연어 검색→Qt 재생 전체 시연, 최신 Pi/VMS 추적 계약 적용, 실제 Pi 영상의 새 WebRTC 경로, 다중 카메라 부하·장시간 시험은 남아 있습니다. 과거 핑크색 프레임 등 영상 이상 조사 기록은 [troubleshotting.md](troubleshotting.md)를 참고하세요.
 
 ## 관련 저장소·문서
 
