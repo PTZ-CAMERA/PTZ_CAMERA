@@ -3,6 +3,8 @@
  * 카메라 송출/추적/탐지의 최신 상태와 구독의 lease, 대기 요청 소유자, 전달 큐를 관리한다.
  * 같은 ONVIF poll 루프에서만 접근하므로 별도 mutex나 broker 작업 스레드를 만들지 않는다.
  * Changed는 토픽별 최신 값으로 합친다. 영상 좌표의 오래된 backlog를 재생하지 않는다. 이벤트 시간은 센서 노출 시각이 아니다.
+ * property의 최신 상태와 Runtime/StateEvent의 발생 기록은 서로 다른 의미다.
+ * VMS는 이 차이를 유지해 상태 초기화를 새로운 사람 등장으로 저장하지 않아야 한다.
  * 사용 API의 선언은 include된 헤더에서, 전체 데이터 흐름은 docs/architecture.md에서 확인한다.
  */
 #include "events/event_broker.h"

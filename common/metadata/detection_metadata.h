@@ -14,6 +14,8 @@ namespace ptz {
 // IPC v2 자료형. bbox는 송출 이미지의 pixel 좌표이며 오른쪽/아래쪽 끝은 제외한다.
 // framePtsNs는 해당 publisher의 running time, streamEpoch는 재시작 식별자다.
 // captureUnixMs는 PTS로 추정한 UTC이며 0은 알 수 없음. object ID는 발급하지 않는다.
+// streamEpoch와 frameId를 함께 사용해야 publisher 재시작 전후의 프레임을 구분할 수 있다.
+// generation은 수동 개입 뒤 오래된 추론 결과를 거르는 제어 세대이며 프레임 시각이 아니다.
 struct DetectionMetadata {
     double confidence = 0;
     std::int64_t x=0, y=0, errorX=0, errorY=0;

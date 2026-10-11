@@ -18,6 +18,8 @@ const char* ptzModeName(PtzMode mode) {
     return "MANUAL";
 }
 void ControlArbiter::manual(MotionClock::time_point now) {
+    // 사용자의 추적 요청(requested_)과 지금 자동 출력을 허용하는 상태(gate_)를 분리한다.
+    // 정책은 여기서 결정하고 GPIO 출력은 Controller/Driver 계층에서 수행한다.
     if (mode_!=PtzMode::Manual) edge::log("PTZ",std::string("Mode ")+ptzModeName(mode_)+" -> MANUAL");
     mode_=PtzMode::Manual;
     gate_=requested_ ? TrackingGate::ManualOverride : TrackingGate::Disabled;

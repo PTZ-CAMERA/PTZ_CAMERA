@@ -2,7 +2,8 @@
  * [학습 안내] 카메라 송출과 사람 자동 추적의 실행 진입점
  * 카메라를 한 번 열어 tee에서 송출과 압축 전 분석 영상으로 나눈다.
  * GLib 메인 루프는 오류/종료를 감시하고 별도 std::thread가 OpenCV 추론을 수행한다.
- * 분석은 최신 대기 프레임을 선택하고 600ms 초과 결과로 이동하지 않는다. Qt 재생 버퍼는 추론 입력에 들어가지 않는다.
+ * 분석은 최신 대기 프레임을 선택하고 설정 maxFrameAgeMs를 초과한 결과로 이동하지 않는다.
+ * 추론 worker가 카메라 UI/녹화/검색을 담당하지 않으며 이동은 ServoClient의 IPC로 전달한다.
  * 사용 API의 선언은 include된 헤더에서, 전체 데이터 흐름은 docs/architecture.md에서 확인한다.
  */
 #include "performance/gstreamer_metrics.h"

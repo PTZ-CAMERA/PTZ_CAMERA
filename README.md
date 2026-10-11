@@ -117,3 +117,7 @@ Pi 소스의 단위·모의 시험 결과와 설치 바이너리·실물 결과�
 [PTZ_VMS_Server](https://github.com/PTZ-CAMERA/PTZ_VMS_Server) · [Qt_Client](https://github.com/PTZ-CAMERA/Qt_Client) · [PTZ_WEB_Client](https://github.com/PTZ-CAMERA/PTZ_WEB_Client)
 
 [통합 빌드](edge-camera/README.md) · [Pi 서비스](pi/README.md) · [공통 코드](common/README.md) · [문서](docs/README.md) · [도구](tools/README.md) · [Pi 설계](docs/EDGE_CAMERA_ARCHITECTURE.md) · [최신 변경 보고서](docs/EDGE_CAMERA_SOFTWARE_REPORT.md)
+
+## 코드 안내
+
+통합 CMake와 설치 경로를 유지하고 제어 소유권·추적 세대·메타데이터 시각의 설명 주석을 보완했습니다. [CODE_GUIDE](docs/CODE_GUIDE.md). 이번 정리는 동작·설정·서비스 적용을 변경하지 않습니다.
